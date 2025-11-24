@@ -72,9 +72,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // Funkce pro generování nové Sudoku hry s ohledem na obtížnost
+// Funkce pro generování nové Sudoku hry s ohledem na obtížnost (OPRAVENÁ VERZE)
     function generateSudoku(difficulty) {
         let grid = generateEmptyGrid();
 
+        // Funkce pro vyplnění 3x3 bloku (pro počáteční rychlost)
         function fillBox(grid, row, col) {
             let nums = [1, 2, 3, 4, 5, 6, 7, 8, 9];
             shuffleArray(nums);
@@ -84,17 +86,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
+
+        // KROK 1: Vyplníme diagonální 3x3 bloky
         fillBox(grid, 0, 0);
         fillBox(grid, 3, 3);
         fillBox(grid, 6, 6);
 
-        solveSudoku(grid); // Vyřešená mřížka
+        // KROK 2: Dokončíme CELOU mřížku pomocí solveSudoku
+        
+        // Funkce solveSudoku vrací NOVOU, vyřešenou mřížku. 
+        // Musíme ji přiřadit zpět k proměnné 'grid'.
+        grid = solveSudoku(grid); // <--- ZDE BYL PROBLÉM (Chybělo přiřazení)
+        
+        // !!! POZOR: Pokud solveSudoku vrátilo null/false (i když by nemělo), musíme zajistit, že je to pole.
+        // Pro jistotu přidáme kontrolu nebo restart. Pro zjednodušení předpokládáme, že řešení bylo nalezeno.
+        if (!grid || grid[0][0] === 0) {
+             // Pokud se nepodařilo vyřešit (což by nemělo), zkusíme znovu
+             return generateSudoku(difficulty); 
+        }
 
-        // Odstraníme čísla na základě obtížnosti
+        // KROK 3: Odstraníme čísla na základě obtížnosti
         const cellsToRemove = DIFFICULTY_MAP[difficulty];
         let cells = Array.from({length: 81}, (v, i) => i);
         shuffleArray(cells);
+        
+        // Uložíme si kompletně vyřešenou mřížku (řešení)
+        const solvedGrid = grid.map(row => [...row]);
 
+        // Vytvoříme mřížku pro hru (hádanku) odstraněním čísel
         for (let i = 0; i < cellsToRemove; i++) {
             let r = Math.floor(cells[i] / 9);
             let c = cells[i] % 9;
