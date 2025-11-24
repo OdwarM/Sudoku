@@ -11,7 +11,7 @@ body {
 
 .container {
     background-color: #cfccc8;
-    padding: 30px;
+    padding: 10px;
     border-radius: 10px;
     box-shadow: 0 0 20px rgba(255, 255, 255, 0.05);
     text-align: center;
@@ -171,3 +171,4 @@ h1 {
     color: #721c24;
     text-decoration: underline;
 }
+
