@@ -9,8 +9,24 @@
 <body>
     <div class="container">
         <h1>Sudoku Hra</h1>
-        <div id="sudoku-grid" class="sudoku-grid">
-            </div>
+        
+        <div class="difficulty-controls">
+            <label for="difficulty">Obtížnost:</label>
+            <select id="difficulty">
+                <option value="easy">Lehká (40 skrytých)</option>
+                <option value="medium" selected>Střední (50 skrytých)</option>
+                <option value="hard">Těžká (60 skrytých)</option>
+            </select>
+        </div>
+
+        <div class="game-area">
+            <div id="sudoku-grid" class="sudoku-grid">
+                </div>
+            
+            <div id="number-buttons" class="number-buttons">
+                </div>
+        </div>
+
         <div class="controls">
             <button id="new-game-btn">Nová Hra</button>
             <button id="check-solution-btn">Zkontrolovat Řešení</button>
