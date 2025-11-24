@@ -4,15 +4,16 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    background-color: #f0f0f0;
+    /* Ponechán tvůj aktuální gradient pro pozadí */
+    background: linear-gradient(135deg, #e9eef5, #f9f9f9); 
     margin: 0;
 }
 
 .container {
-    background-color: #fff;
+    background-color: #cfccc8;
     padding: 30px;
     border-radius: 10px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.05);
     text-align: center;
 }
 
@@ -26,22 +27,23 @@ h1 {
     margin-bottom: 20px;
 }
 
-/* NOVÝ Kontejner pro mřížku a čísla */
+/* Kontejner herní plochy */
 .game-area {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
+    /* ZMĚNA: Odstraněn display: flex, aby se .sudoku-grid a .number-buttons řadily pod sebe (to závisí i na HTML) */
+    margin-bottom: 20px;
 }
 
+/* KONTROLA: Zajištění správného zobrazení 9x9 mřížky */
 .sudoku-grid {
-    display: grid;
+    display: grid; /* KRITICKÉ: Nastaví .sudoku-grid jako kontejner mřížky */
     grid-template-columns: repeat(9, 40px);
     grid-template-rows: repeat(9, 40px);
     border: 2px solid #333; /* Vnější ohraničení celé mřížky */
-    margin: 0;
+    margin: 0 auto; /* Centrování mřížky */
     width: fit-content;
 }
 
+/* Jednotlivá buňka */
 .cell {
     width: 40px;
     height: 40px;
@@ -54,36 +56,26 @@ h1 {
     cursor: pointer;
     user-select: none;
     box-sizing: border-box;
-    transition: background-color 0.1s; /* Plynulejší přechod při výběru */
-}
-
-/* Zvýraznění všech stejných čísel */
-.cell {
-    /* ... (původní styly) ... */
-    background-color: #fff;
-    cursor: pointer;
-    user-select: none;
-    box-sizing: border-box;
     transition: background-color 0.1s;
 }
 
-/* Zvýraznění všech stejných čísel */
+/* Zvýraznění všech stejných čísel (Pro buňky i pevná čísla) */
 .cell.highlighted {
-    background-color: #ffebcc !important; /* Důležité: Přidáno !important pro přepsání fixed*/
+    background-color: #ffebcc !important; /* Světle oranžová - !important pro přepsání .fixed */
 }
 
 .cell.fixed {
     font-weight: bold;
     color: #0056b3;
-    background-color: #e9ecef; /* Toto se nyní přepíše */
+    background-color: #e9ecef; /* Výchozí pozadí pevné buňky */
     cursor: default;
 }
 
-/* NOVÉ PRAVIDLO: Zajišťuje, že pevná buňka, která je zároveň zvýrazněná, se vykreslí správně. */
+/* Pravidlo, které zajistí, že zvýrazněná pevná buňka je správně barevná */
 .cell.fixed.highlighted {
-    background-color: #ffebcc; /* Zkopírována barva zvýraznění */
-    color: #0056b3; /* Zachová modrý font pro pevné číslo */
-    font-weight: bold; /* Zachová tučný font */
+    background-color: #ffebcc !important;
+    color: #0056b3;
+    font-weight: bold;
 }
 
 .cell.selected {
@@ -110,13 +102,18 @@ h1 {
     border-bottom-color: #ccc;
 }
 
-/* NOVÉ: Styly pro číselná tlačítka 1-9 */
+/* ÚPRAVA: Styly pro číselná tlačítka 1-9 (horizontálně pod mřížkou) */
 .number-buttons {
-    display: grid;
-    grid-template-rows: repeat(9, 36px);
+    display: grid; 
+    grid-template-columns: repeat(9, 36px); /* 9 sloupců */
+    grid-template-rows: 1fr; /* Zajišťuje jeden řádek (horizontální uspořádání) */
     gap: 5px;
+    margin: 20px auto; 
+    width: fit-content;
+    /* Odebrán background-color: #fff; pro viditelné mezery */
 }
 
+/* Jednotlivé číselné tlačítko */
 .number-btn {
     width: 36px;
     height: 36px;
@@ -127,17 +124,14 @@ h1 {
     font-weight: bold;
     background-color: #f8f9fa;
     border: 1px solid #ced4da;
-    border-radius: 5px;
+    border-radius: 5px; /* Zaoblené rohy */
     cursor: pointer;
     transition: background-color 0.2s, box-shadow 0.2s;
 }
 
-.number-btn:hover {
-    background-color: #e9ecef;
-}
-
+/* Stav pro aktivní číslo (štětec) - Reaguje na kliknutí a zvýrazní se */
 .number-btn.active {
-    background-color: #007bff;
+    background-color: #007bff; /* Modré pozadí */
     color: white;
     box-shadow: 0 0 8px rgba(0, 123, 255, 0.5);
 }
@@ -166,7 +160,6 @@ h1 {
 #message {
     font-weight: bold;
     margin-top: 15px;
-    /*... barvy jako dříve ...*/
 }
 
 .cell.player-input {
@@ -174,6 +167,7 @@ h1 {
 }
 
 .cell.invalid {
-    background-color: #f8d7da;
+    background-color: #f54c57;
     color: #721c24;
+    text-decoration: underline;
 }
