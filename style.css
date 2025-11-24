@@ -1,0 +1,122 @@
+body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f0f0f0;
+    margin: 0;
+}
+
+.container {
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+h1 {
+    color: #333;
+    margin-bottom: 25px;
+}
+
+.sudoku-grid {
+    display: grid;
+    grid-template-columns: repeat(9, 40px);
+    grid-template-rows: repeat(9, 40px);
+    border: 2px solid #333; /* Vnější ohraničení celé mřížky */
+    margin: 0 auto 25px auto;
+    width: fit-content;
+}
+
+.cell {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.2em;
+    border: 1px solid #ccc; /* Základní ohraničení buňky */
+    background-color: #fff;
+    cursor: pointer;
+    user-select: none;
+    box-sizing: border-box; /* Zajišťuje, že padding a border se počítají do celkové šířky/výšky */
+}
+
+.cell.fixed {
+    font-weight: bold;
+    color: #0056b3; /* Modrá pro předvyplněná čísla */
+    background-color: #e9ecef;
+    cursor: default;
+}
+
+.cell.selected {
+    background-color: #d1ecf1; /* Světle modrá pro vybranou buňku */
+    border: 1px solid #007bff;
+}
+
+/* Stylování pro 3x3 bloky - tlustší ohraničení */
+
+/* Vertikální ohraničení bloků */
+.cell:nth-child(3n) {
+    border-right-width: 2px;
+    border-right-color: #333;
+}
+/* Reset pro konec řádku, aby se duplicitně neodečítal vnější border */
+.cell:nth-child(9n) {
+    border-right-width: 1px;
+    border-right-color: #ccc;
+}
+
+/* Horizontální ohraničení bloků */
+/* Cílíme na buňky ve 3., 4., 6., 7. řádku */
+.cell:nth-child(n + 19):nth-child(-n + 27), /* 3. řádek bloků (řádky 3,4,5) */
+.cell:nth-child(n + 46):nth-child(-n + 54) { /* 6. řádek bloků (řádky 6,7,8) */
+    border-bottom-width: 2px;
+    border-bottom-color: #333;
+}
+/* Reset pro buňky, které nejsou na konci 3x3 bloku */
+/* V posledním řádku sudoku se border-bottom zruší, řeší to vnější border na .sudoku-grid */
+.cell:nth-child(n+73):nth-child(-n+81) {
+    border-bottom-width: 1px;
+    border-bottom-color: #ccc;
+}
+
+
+.controls {
+    margin-bottom: 20px;
+}
+
+.controls button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    margin: 0 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    transition: background-color 0.2s;
+}
+
+.controls button:hover {
+    background-color: #0056b3;
+}
+
+#message {
+    font-weight: bold;
+    margin-top: 15px;
+    color: #dc3545; /* Červená pro chybové zprávy */
+}
+
+/* Pro čísla, která hráč zadal a jsou správně */
+.cell.player-input {
+    color: #28a745; /* Zelená pro správně zadaná čísla */
+}
+
+/* Pro čísla, která hráč zadal a jsou špatně */
+.cell.invalid {
+    background-color: #f8d7da; /* Světle červená */
+    color: #721c24; /* Tmavě červená */
+}
