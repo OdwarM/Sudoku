@@ -18,7 +18,19 @@ body {
 
 h1 {
     color: #333;
-    margin-bottom: 25px;
+    margin-bottom: 20px;
+}
+
+/* Styl pro obtížnost */
+.difficulty-controls {
+    margin-bottom: 20px;
+}
+
+/* NOVÝ Kontejner pro mřížku a čísla */
+.game-area {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
 }
 
 .sudoku-grid {
@@ -26,7 +38,7 @@ h1 {
     grid-template-columns: repeat(9, 40px);
     grid-template-rows: repeat(9, 40px);
     border: 2px solid #333; /* Vnější ohraničení celé mřížky */
-    margin: 0 auto 25px auto;
+    margin: 0;
     width: fit-content;
 }
 
@@ -41,14 +53,37 @@ h1 {
     background-color: #fff;
     cursor: pointer;
     user-select: none;
-    box-sizing: border-box; /* Zajišťuje, že padding a border se počítají do celkové šířky/výšky */
+    box-sizing: border-box;
+    transition: background-color 0.1s; /* Plynulejší přechod při výběru */
+}
+
+/* Zvýraznění všech stejných čísel */
+.cell {
+    /* ... (původní styly) ... */
+    background-color: #fff;
+    cursor: pointer;
+    user-select: none;
+    box-sizing: border-box;
+    transition: background-color 0.1s;
+}
+
+/* Zvýraznění všech stejných čísel */
+.cell.highlighted {
+    background-color: #ffebcc !important; /* Důležité: Přidáno !important pro přepsání fixed*/
 }
 
 .cell.fixed {
     font-weight: bold;
-    color: #0056b3; /* Modrá pro předvyplněná čísla */
-    background-color: #e9ecef;
+    color: #0056b3;
+    background-color: #e9ecef; /* Toto se nyní přepíše */
     cursor: default;
+}
+
+/* NOVÉ PRAVIDLO: Zajišťuje, že pevná buňka, která je zároveň zvýrazněná, se vykreslí správně. */
+.cell.fixed.highlighted {
+    background-color: #ffebcc; /* Zkopírována barva zvýraznění */
+    color: #0056b3; /* Zachová modrý font pro pevné číslo */
+    font-weight: bold; /* Zachová tučný font */
 }
 
 .cell.selected {
@@ -57,34 +92,58 @@ h1 {
 }
 
 /* Stylování pro 3x3 bloky - tlustší ohraničení */
-
-/* Vertikální ohraničení bloků */
 .cell:nth-child(3n) {
     border-right-width: 2px;
     border-right-color: #333;
 }
-/* Reset pro konec řádku, aby se duplicitně neodečítal vnější border */
 .cell:nth-child(9n) {
     border-right-width: 1px;
     border-right-color: #ccc;
 }
-
-/* Horizontální ohraničení bloků */
-/* Cílíme na buňky ve 3., 4., 6., 7. řádku */
-.cell:nth-child(n + 19):nth-child(-n + 27), /* 3. řádek bloků (řádky 3,4,5) */
-.cell:nth-child(n + 46):nth-child(-n + 54) { /* 6. řádek bloků (řádky 6,7,8) */
+.cell:nth-child(n + 19):nth-child(-n + 27),
+.cell:nth-child(n + 46):nth-child(-n + 54) {
     border-bottom-width: 2px;
     border-bottom-color: #333;
 }
-/* Reset pro buňky, které nejsou na konci 3x3 bloku */
-/* V posledním řádku sudoku se border-bottom zruší, řeší to vnější border na .sudoku-grid */
 .cell:nth-child(n+73):nth-child(-n+81) {
     border-bottom-width: 1px;
     border-bottom-color: #ccc;
 }
 
+/* NOVÉ: Styly pro číselná tlačítka 1-9 */
+.number-buttons {
+    display: grid;
+    grid-template-rows: repeat(9, 36px);
+    gap: 5px;
+}
+
+.number-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.2em;
+    font-weight: bold;
+    background-color: #f8f9fa;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.number-btn:hover {
+    background-color: #e9ecef;
+}
+
+.number-btn.active {
+    background-color: #007bff;
+    color: white;
+    box-shadow: 0 0 8px rgba(0, 123, 255, 0.5);
+}
 
 .controls {
+    margin-top: 25px;
     margin-bottom: 20px;
 }
 
@@ -107,16 +166,14 @@ h1 {
 #message {
     font-weight: bold;
     margin-top: 15px;
-    color: #dc3545; /* Červená pro chybové zprávy */
+    /*... barvy jako dříve ...*/
 }
 
-/* Pro čísla, která hráč zadal a jsou správně */
 .cell.player-input {
-    color: #28a745; /* Zelená pro správně zadaná čísla */
+    color: #28a745;
 }
 
-/* Pro čísla, která hráč zadal a jsou špatně */
 .cell.invalid {
-    background-color: #f8d7da; /* Světle červená */
-    color: #721c24; /* Tmavě červená */
+    background-color: #f8d7da;
+    color: #721c24;
 }
