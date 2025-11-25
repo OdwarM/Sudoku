@@ -12,13 +12,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let initialGrid = [];
     let currentGrid = [];
     let selectedCell = null;
-    let activeNumber = null;
+    let activeNumber = null; // Číslo vybrané jako "štětec"
 
     const DIFFICULTY_MAP = {
         'easy': 40,
         'medium': 50,
         'hard': 60
     };
+    
 
     // --- FUNKCE PRO LOGIKU SUDOKU ---
 
@@ -94,8 +95,8 @@ document.addEventListener('DOMContentLoaded', () => {
         grid = solveSudoku(grid);
         
         if (!grid || grid[0][0] === 0) {
-             // Pokud se nepodařilo vyřešit, zkusíme znovu
-             return generateSudoku(difficulty); 
+              // Pokud se nepodařilo vyřešit, zkusíme znovu
+              return generateSudoku(difficulty); 
         }
 
         // KROK 3: Odstraníme čísla na základě obtížnosti
@@ -121,6 +122,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- POMOCNÉ FUNKCE PRO VIZUÁL A INTERAKCI ---
+    
+    // Funkce pro spolehlivé spuštění zvuku (vytvoří novou instanci)
+    function playSound() {
+        const sound = new Audio('./sound/click.wav'); 
+        sound.play().catch(e => console.error("Zvuk se nepodařilo spustit:", e));
+    }
     
     // NOVÉ: Funkce pro vyčištění všech zvýraznění
     function clearNumberHighlights() {
@@ -192,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
         highlightSameNumbers(activeNumber); 
     }
 
-    // Handler pro kliknutí na buňku
+    // Handler pro kliknutí na buňku (ZÁPIS NEBO VÝBĚR)
     function handleCellClick(event) {
         const targetCell = event.target;
         messageDisplay.textContent = ''; // Vymažeme zprávy
@@ -203,34 +210,36 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedCell.classList.remove('selected');
         }
 
-        // Vybereme buňku, pokud není pevná, nebo je-li to pevná buňka, pouze ji zvýrazníme, ale nedovolíme zadávat čísla
         selectedCell = targetCell;
         selectedCell.classList.add('selected');
 
-        // 2. Zadávání čísla, pokud je aktivní "štětec" a buňka není pevná
+        // 2. Zadávání čísla, POUZE pokud je aktivní "štětec" a buňka není pevná
         if (!isFixed && activeNumber !== null) {
             const row = parseInt(selectedCell.dataset.row);
             const col = parseInt(selectedCell.dataset.col);
             
+            // Zápis čísla
             selectedCell.textContent = activeNumber;
             currentGrid[row][col] = activeNumber;
+            
+            // ZVUKOVÁ ODEZVA - POUZE při úspěšném vložení
+            playSound(); 
             
             selectedCell.classList.remove('invalid');
             selectedCell.classList.add('player-input');
 
             // Aktualizujeme zvýraznění po vložení čísla
             highlightSameNumbers(activeNumber);
-        }
+            
+        } 
         
-        // 3. Logika zvýraznění všech stejných čísel (z pevné nebo zadané buňky)
+        // 3. Logika zvýraznění: Pouze zvýrazní čísla v mřížce (pokud existují) nebo aktivní číslo (štětec)
         const cellValue = parseInt(targetCell.textContent);
         if (cellValue >= 1 && cellValue <= 9) {
-            activeNumber = cellValue;
+            highlightSameNumbers(cellValue); // Zvýrazníme číslo v buňce
+        } else {
+            // Pokud je prázdná, zvýrazníme aktivní číslo ze štětce
             highlightSameNumbers(activeNumber);
-        } else if (targetCell.classList.contains('selected') && targetCell.textContent === '') {
-            // Kliknuto na prázdnou buňku, deaktivujeme štětec a zvýraznění
-            activeNumber = null;
-            highlightSameNumbers(null);
         }
     }
     
@@ -247,7 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Handler pro kliknutí na číselné tlačítko
+    // Handler pro kliknutí na číselné tlačítko (VÝBĚR ŠTĚTCE)
     function handleNumberButtonClick(event) {
         const num = parseInt(event.target.dataset.number);
 
@@ -259,17 +268,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Zvýrazníme číslo v mřížce a aktivní tlačítko
-        highlightSameNumbers(activeNumber);
+        highlightSameNumbers(activeNumber); 
         
-        // Pokud je buňka vybraná a není pevná, vložíme číslo
-        if (selectedCell && !selectedCell.classList.contains('fixed') && activeNumber !== null) {
-             const row = parseInt(selectedCell.dataset.row);
-             const col = parseInt(selectedCell.dataset.col);
-             currentGrid[row][col] = activeNumber;
-             selectedCell.textContent = activeNumber;
-             selectedCell.classList.remove('invalid');
-             selectedCell.classList.add('player-input');
+        // ZVUKOVÁ ODEZVA - POUZE při výběru/změně štětce
+        if (activeNumber !== null) {
+            playSound();
         }
+        
+        // *** DŮLEŽITÉ: Zápis do selectedCell zde byl odstraněn. Nyní se provádí v handleCellClick. ***
     }
 
     // NOVÉ: Funkce pro smazání čísla po kliknutí na tlačítko
@@ -301,14 +307,13 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 5. Zrušíme zvýraznění aktivního čísla (pokud číslo, které jsme smazali, bylo aktivní)
         clearNumberHighlights(); 
-        activeNumber = null;
+        activeNumber = null; // Zrušíme i štětec
         
-        // 6. Provedeme novou kontrolu řešení na celé mřížce
-        // checkSolution(); // Tuto funkci můžeme volat, pokud chceme, aby se po každém smazání zkontrolovaly chyby
+        playSound(); // Zvuková odezva pro smazání
         showMessage('Číslo bylo smazáno.', 'info');
     }
     
-    // Handler pro zadávání čísel z klávesnice
+// Handler pro zadávání čísel z klávesnice (CHYPOVÉ ZADÁNÍ)
     document.addEventListener('keydown', (event) => {
         if (!selectedCell || selectedCell.classList.contains('fixed')) {
             return;
@@ -318,21 +323,30 @@ document.addEventListener('DOMContentLoaded', () => {
         const row = parseInt(selectedCell.dataset.row);
         const col = parseInt(selectedCell.dataset.col);
         
-        // Deaktivujeme aktivní číslo (štětec)
+        // Chceme, aby se zadání z klávesnice chovalo jako přímý zápis a rušilo štětec
         activeNumber = null;
-        clearNumberHighlights(); 
+        clearNumberHighlights(); // Zruší zvýraznění štětce
+        
 
+        // Zápis z klávesnice
         if (key >= '1' && key <= '9') {
             const num = parseInt(key);
             selectedCell.textContent = num;
             currentGrid[row][col] = num;
             selectedCell.classList.remove('invalid');
             selectedCell.classList.add('player-input');
+            
+            playSound(); 
+            highlightSameNumbers(num); // Zvýrazníme číslo, které jsme právě zadali
+            
         } else if (key === 'Backspace' || key === 'Delete') {
-            // Logika mazání z klávesnice je zde již implementována
+            // Logika mazání z klávesnice
             selectedCell.textContent = '';
             currentGrid[row][col] = 0;
             selectedCell.classList.remove('player-input', 'invalid');
+            
+            playSound(); 
+            highlightSameNumbers(null);
         }
     });
 
@@ -363,7 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isCorrect) {
             showMessage('Gratulujeme! Sudoku je správně vyřešeno!', 'success');
         } else {
-            showMessage('Řešení není správné. Zkontrolujte zvýrazněné (červené) buňky.', 'error');
+            showMessage('Zkontrolujte zvýrazněné (červené) buňky.', 'error');
         }
     }
 
