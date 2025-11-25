@@ -5,28 +5,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const messageDisplay = document.getElementById('message');
     const difficultySelect = document.getElementById('difficulty');
     const numberButtonsContainer = document.getElementById('number-buttons');
+    
+    // NOVÉ: Deklarace tlačítka pro mazání
+    const deleteNumbersBtn = document.getElementById('delete-numbers'); 
 
     let initialGrid = [];
     let currentGrid = [];
     let selectedCell = null;
-    let activeNumber = null; // NOVÉ: Aktivní číslo pro automatické zadávání
+    let activeNumber = null;
 
-    // NOVÉ: Mapování obtížnosti na počet skrytých čísel
     const DIFFICULTY_MAP = {
         'easy': 40,
         'medium': 50,
         'hard': 60
     };
 
-    // --- FUNKCE PRO LOGIKU SUDOKU (Neměněno) ---
+    // --- FUNKCE PRO LOGIKU SUDOKU ---
 
     function generateEmptyGrid() {
         return Array(9).fill(null).map(() => Array(9).fill(0));
     }
     
-    // ... solveSudoku, isValid (Logika pro řešení) zůstávají stejné ...
-
-    // Funkce pro řešení Sudoku pomocí backtracking algoritmu (Zde ponecháno pro funkčnost, ale pro úsporu místa zkráceno - kód je stejný jako dříve)
+    // Funkce pro řešení Sudoku pomocí backtracking algoritmu
     function solveSudoku(grid) {
         const N = 9;
         const findEmpty = (grid) => {
@@ -72,11 +72,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // Funkce pro generování nové Sudoku hry s ohledem na obtížnost
-// Funkce pro generování nové Sudoku hry s ohledem na obtížnost (OPRAVENÁ VERZE)
     function generateSudoku(difficulty) {
         let grid = generateEmptyGrid();
 
-        // Funkce pro vyplnění 3x3 bloku (pro počáteční rychlost)
         function fillBox(grid, row, col) {
             let nums = [1, 2, 3, 4, 5, 6, 7, 8, 9];
             shuffleArray(nums);
@@ -93,15 +91,10 @@ document.addEventListener('DOMContentLoaded', () => {
         fillBox(grid, 6, 6);
 
         // KROK 2: Dokončíme CELOU mřížku pomocí solveSudoku
+        grid = solveSudoku(grid);
         
-        // Funkce solveSudoku vrací NOVOU, vyřešenou mřížku. 
-        // Musíme ji přiřadit zpět k proměnné 'grid'.
-        grid = solveSudoku(grid); // <--- ZDE BYL PROBLÉM (Chybělo přiřazení)
-        
-        // !!! POZOR: Pokud solveSudoku vrátilo null/false (i když by nemělo), musíme zajistit, že je to pole.
-        // Pro jistotu přidáme kontrolu nebo restart. Pro zjednodušení předpokládáme, že řešení bylo nalezeno.
         if (!grid || grid[0][0] === 0) {
-             // Pokud se nepodařilo vyřešit (což by nemělo), zkusíme znovu
+             // Pokud se nepodařilo vyřešit, zkusíme znovu
              return generateSudoku(difficulty); 
         }
 
@@ -110,9 +103,6 @@ document.addEventListener('DOMContentLoaded', () => {
         let cells = Array.from({length: 81}, (v, i) => i);
         shuffleArray(cells);
         
-        // Uložíme si kompletně vyřešenou mřížku (řešení)
-        const solvedGrid = grid.map(row => [...row]);
-
         // Vytvoříme mřížku pro hru (hádanku) odstraněním čísel
         for (let i = 0; i < cellsToRemove; i++) {
             let r = Math.floor(cells[i] / 9);
@@ -130,15 +120,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- RENDER A INTERAKCE ---
+    // --- POMOCNÉ FUNKCE PRO VIZUÁL A INTERAKCI ---
+    
+    // NOVÉ: Funkce pro vyčištění všech zvýraznění
+    function clearNumberHighlights() {
+        const allCells = document.querySelectorAll('.cell');
+        allCells.forEach(cell => {
+            cell.classList.remove('highlighted');
+        });
+        // Zruší zvýraznění i na tlačítkách 1-9
+        document.querySelectorAll('.number-btn').forEach(btn => btn.classList.remove('active'));
+    }
 
-    // NOVÉ: Funkce pro zvýraznění všech stejných čísel
+    // Funkce pro zvýraznění všech stejných čísel
     function highlightSameNumbers(num) {
-        const cells = document.querySelectorAll('.cell');
-        // Nejprve odstraníme všechna zvýraznění
-        cells.forEach(cell => cell.classList.remove('highlighted'));
+        // Nejprve odstraníme všechna zvýraznění z mřížky a tlačítek
+        clearNumberHighlights(); 
 
         if (num === 0 || num === null) return; // Nic k zvýraznění
+
+        const cells = document.querySelectorAll('.cell');
 
         // Zvýrazníme buňky s daným číslem
         cells.forEach(cell => {
@@ -148,15 +149,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Zvýrazníme aktivní tlačítko
-        document.querySelectorAll('.number-btn').forEach(btn => btn.classList.remove('active'));
         const activeBtn = document.querySelector(`.number-btn[data-number="${num}"]`);
         if (activeBtn) {
             activeBtn.classList.add('active');
         }
     }
+    
+    function showMessage(text, type = 'info') {
+        messageDisplay.textContent = text;
+        messageDisplay.style.color = type === 'error' ? '#dc3545' : (type === 'success' ? '#28a745' : '#333');
+    }
 
+    // --- FUNKCE PRO VYKRESLENÍ A HANDLERY ---
 
-    // Funkce pro vykreslení Sudoku mřížky do HTML
     // Funkce pro vykreslení Sudoku mřížky do HTML
     function renderGrid(grid) {
         sudokuGrid.innerHTML = '';
@@ -171,18 +176,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (initialGrid[rowIndex][colIndex] !== 0) {
                     cell.classList.add('fixed');
                     cell.textContent = initialGrid[rowIndex][colIndex];
-                    // PŘIDÁNO: I PEVNÉ BUŇKY POTŘEBUJÍ CLICK LISTENER PRO ZVÝRAZNĚNÍ
                     cell.addEventListener('click', handleCellClick); 
                 } else {
                     cell.textContent = num !== 0 ? num : '';
                     cell.addEventListener('click', handleCellClick);
+                    // PŘIDÁNO: Pokud je číslo zadané hráčem, přidáme třídu
+                    if (num !== 0) {
+                        cell.classList.add('player-input');
+                    }
                 }
                 
-                // ... (Zbytek renderGrid)
                 sudokuGrid.appendChild(cell);
             });
         });
-        // Při vykreslení mřížky aplikujeme zvýraznění aktivního čísla
         highlightSameNumbers(activeNumber); 
     }
 
@@ -191,31 +197,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const targetCell = event.target;
         messageDisplay.textContent = ''; // Vymažeme zprávy
 
-        // 1. Logika výběru buňky pro zadání čísla
-        if (!targetCell.classList.contains('fixed')) {
-             if (selectedCell) {
-                selectedCell.classList.remove('selected');
-            }
-            selectedCell = targetCell;
-            selectedCell.classList.add('selected');
-
-            // Pokud máme aktivní číslo (štětec), vložíme ho
-            if (activeNumber !== null) {
-                const row = parseInt(selectedCell.dataset.row);
-                const col = parseInt(selectedCell.dataset.col);
-                
-                selectedCell.textContent = activeNumber;
-                currentGrid[row][col] = activeNumber;
-                
-                selectedCell.classList.remove('invalid');
-                selectedCell.classList.add('player-input');
-
-                // Aktualizujeme zvýraznění po vložení čísla
-                highlightSameNumbers(activeNumber);
-            }
+        // 1. Logika výběru buňky
+        const isFixed = targetCell.classList.contains('fixed');
+        if (selectedCell) {
+            selectedCell.classList.remove('selected');
         }
 
-        // 2. Logika zvýraznění všech stejných čísel (z pevné nebo zadané buňky)
+        // Vybereme buňku, pokud není pevná, nebo je-li to pevná buňka, pouze ji zvýrazníme, ale nedovolíme zadávat čísla
+        selectedCell = targetCell;
+        selectedCell.classList.add('selected');
+
+        // 2. Zadávání čísla, pokud je aktivní "štětec" a buňka není pevná
+        if (!isFixed && activeNumber !== null) {
+            const row = parseInt(selectedCell.dataset.row);
+            const col = parseInt(selectedCell.dataset.col);
+            
+            selectedCell.textContent = activeNumber;
+            currentGrid[row][col] = activeNumber;
+            
+            selectedCell.classList.remove('invalid');
+            selectedCell.classList.add('player-input');
+
+            // Aktualizujeme zvýraznění po vložení čísla
+            highlightSameNumbers(activeNumber);
+        }
+        
+        // 3. Logika zvýraznění všech stejných čísel (z pevné nebo zadané buňky)
         const cellValue = parseInt(targetCell.textContent);
         if (cellValue >= 1 && cellValue <= 9) {
             activeNumber = cellValue;
@@ -227,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // NOVÉ: Generování tlačítek 1-9
+    // Generování tlačítek 1-9
     function createNumberButtons() {
         numberButtonsContainer.innerHTML = '';
         for (let i = 1; i <= 9; i++) {
@@ -240,7 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // NOVÉ: Handler pro kliknutí na číselné tlačítko
+    // Handler pro kliknutí na číselné tlačítko
     function handleNumberButtonClick(event) {
         const num = parseInt(event.target.dataset.number);
 
@@ -253,9 +260,55 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Zvýrazníme číslo v mřížce a aktivní tlačítko
         highlightSameNumbers(activeNumber);
+        
+        // Pokud je buňka vybraná a není pevná, vložíme číslo
+        if (selectedCell && !selectedCell.classList.contains('fixed') && activeNumber !== null) {
+             const row = parseInt(selectedCell.dataset.row);
+             const col = parseInt(selectedCell.dataset.col);
+             currentGrid[row][col] = activeNumber;
+             selectedCell.textContent = activeNumber;
+             selectedCell.classList.remove('invalid');
+             selectedCell.classList.add('player-input');
+        }
+    }
+
+    // NOVÉ: Funkce pro smazání čísla po kliknutí na tlačítko
+    function handleDeleteClick() {
+        // 1. Zkontrolujeme, zda je nějaká buňka vybrána
+        if (!selectedCell) {
+            showMessage('Nejprve vyberte políčko pro smazání.', 'error');
+            return; 
+        }
+
+        // 2. Zkontrolujeme, zda buňka není původní zadané číslo (fixed)
+        if (selectedCell.classList.contains('fixed')) {
+            showMessage('Nelze mazat původní číslo zadané hrou.', 'error');
+            return;
+        }
+
+        // 3. Provedeme mazání v herní logice (datový model)
+        const row = parseInt(selectedCell.dataset.row);
+        const col = parseInt(selectedCell.dataset.col);
+
+        // Nastavíme hodnotu v herní logice na 0 (prázdné)
+        currentGrid[row][col] = 0; 
+
+        // 4. Aktualizujeme vizuální zobrazení buňky
+        selectedCell.textContent = '';
+        
+        // Odstraníme všechny vizuální stavy
+        selectedCell.classList.remove('player-input', 'invalid'); 
+        
+        // 5. Zrušíme zvýraznění aktivního čísla (pokud číslo, které jsme smazali, bylo aktivní)
+        clearNumberHighlights(); 
+        activeNumber = null;
+        
+        // 6. Provedeme novou kontrolu řešení na celé mřížce
+        // checkSolution(); // Tuto funkci můžeme volat, pokud chceme, aby se po každém smazání zkontrolovaly chyby
+        showMessage('Číslo bylo smazáno.', 'info');
     }
     
-    // Handler pro zadávání čísel z klávesnice (Upraveno pro interakci se zvýrazněním)
+    // Handler pro zadávání čísel z klávesnice
     document.addEventListener('keydown', (event) => {
         if (!selectedCell || selectedCell.classList.contains('fixed')) {
             return;
@@ -265,9 +318,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const row = parseInt(selectedCell.dataset.row);
         const col = parseInt(selectedCell.dataset.col);
         
-        // Deaktivujeme aktivní číslo (štětec), pokud se zadává z klávesnice
+        // Deaktivujeme aktivní číslo (štětec)
         activeNumber = null;
-        highlightSameNumbers(null);
+        clearNumberHighlights(); 
 
         if (key >= '1' && key <= '9') {
             const num = parseInt(key);
@@ -276,23 +329,22 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedCell.classList.remove('invalid');
             selectedCell.classList.add('player-input');
         } else if (key === 'Backspace' || key === 'Delete') {
+            // Logika mazání z klávesnice je zde již implementována
             selectedCell.textContent = '';
             currentGrid[row][col] = 0;
             selectedCell.classList.remove('player-input', 'invalid');
         }
     });
 
-    // Kontrola platnosti celého řešení (Beze změny)
+    // Kontrola platnosti celého řešení
     function checkSolution() {
-        // ... Logika kontroly vítězství je stejná jako dříve ...
-        const tempGrid = currentGrid.map(row => [...row]);
         const solvedInitialGrid = solveSudoku(initialGrid);
 
         let isCorrect = true;
         for (let r = 0; r < 9; r++) {
             for (let c = 0; c < 9; c++) {
                 const cellElement = sudokuGrid.children[r * 9 + c];
-                cellElement.classList.remove('invalid', 'player-input'); 
+                cellElement.classList.remove('invalid'); 
 
                 if (currentGrid[r][c] === 0) {
                     isCorrect = false;
@@ -304,18 +356,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!cellElement.classList.contains('fixed')) {
                         cellElement.classList.add('invalid');
                     }
-                } else if (!cellElement.classList.contains('fixed')) {
-                    cellElement.classList.add('player-input');
                 }
             }
         }
 
         if (isCorrect) {
-            messageDisplay.textContent = 'Gratulujeme! Sudoku je správně vyřešeno!';
-            messageDisplay.style.color = '#28a745';
+            showMessage('Gratulujeme! Sudoku je správně vyřešeno!', 'success');
         } else {
-            messageDisplay.textContent = 'Řešení není správné. Zkontrolujte zvýrazněné buňky.';
-            messageDisplay.style.color = '#dc3545';
+            showMessage('Řešení není správné. Zkontrolujte zvýrazněné (červené) buňky.', 'error');
         }
     }
 
@@ -328,6 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedCell = null;
         }
         activeNumber = null;
+        clearNumberHighlights();
         
         const difficulty = difficultySelect.value;
         initialGrid = generateSudoku(difficulty);
@@ -335,10 +384,13 @@ document.addEventListener('DOMContentLoaded', () => {
         renderGrid(currentGrid);
     }
 
-    // Přidání event listenerů
+    // --- Přidání event listenerů ---
     newGameBtn.addEventListener('click', startNewGame);
     checkSolutionBtn.addEventListener('click', checkSolution);
-    difficultySelect.addEventListener('change', startNewGame); // Spustit novou hru při změně obtížnosti
+    difficultySelect.addEventListener('change', startNewGame);
+    
+    // NOVÉ: Přidání listeneru pro tlačítko mazání
+    deleteNumbersBtn.addEventListener('click', handleDeleteClick);
 
     // Spustit hru při načtení stránky
     createNumberButtons();
