@@ -2,7 +2,7 @@
 // FIREBASE KONFIGURACE
 // =============================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, doc, query, where, orderBy, onSnapshot, getDocs, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, query, where, orderBy, onSnapshot, getDocs, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDvuIqYsTUiVzgul9EONxOhYJaIR2h4N4g",
@@ -514,14 +514,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function saveChallenge() {
         try {
+            // Nové unikátní ID pro tuto výzvu
+            const challengePuzzleId = `challenge_${Date.now()}`;
+
+            // 1. Smaž staré výsledky předchozí výzvy
+            const oldChallenge = await loadChallenge();
+            if (oldChallenge && oldChallenge.puzzleId) {
+                const oldResults = await getDocs(
+                    query(collection(db, 'results'), where('puzzleId', '==', oldChallenge.puzzleId))
+                );
+                for (const d of oldResults.docs) await deleteDoc(d.ref);
+            }
+
+            // 2. Ulož novou výzvu
             await setDoc(doc(db, 'challenge', 'current'), {
-                puzzleId: todayPuzzleId,
+                puzzleId: challengePuzzleId,
                 grid: initialGrid.map(row => [...row]),
                 difficulty: difficultySelect.value,
                 createdBy: playerNickname,
                 createdAt: new Date()
             });
-            showMessage('✅ Hra uložena jako výzva pro ostatní hráče!', 'success');
+
+            // 3. Ulož čas zakladatele jako první výsledek nové výzvy
+            await addDoc(collection(db, 'results'), {
+                puzzleId: challengePuzzleId,
+                nickname: playerNickname,
+                seconds: timerSeconds,
+                timestamp: new Date()
+            });
+
+            // 4. Přepni žebříček na nové challenge puzzleId
+            todayPuzzleId = challengePuzzleId;
+            listenLeaderboard();
+
+            showMessage('✅ Hra uložena jako výzva! Jsi první v novém žebříčku.', 'success');
         } catch (e) { console.error('Chyba při ukládání výzvy:', e); }
     }
 
@@ -544,9 +570,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function listenLeaderboard() {
         if (leaderboardUnsubscribe) { leaderboardUnsubscribe(); leaderboardUnsubscribe = null; }
 
-        // Vždy sleduj soutěžní puzzle ID (i při casual hře)
+        // Použij aktuální todayPuzzleId — může být soutěžní, casual nebo challenge
+        // Pro casual hru zobrazíme výsledky výzvy (pokud existuje), jinak dnešní soutěžní
         const difficulty = difficultySelect.value;
         const competitionPuzzleId = getTodayPuzzleId(difficulty);
+        const leaderboardPuzzleId = isCasualMode ? competitionPuzzleId : todayPuzzleId;
 
         // Poznámka o módu
         if (isCasualMode) {
@@ -559,7 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const q = query(
             collection(db, 'results'),
-            where('puzzleId', '==', competitionPuzzleId),
+            where('puzzleId', '==', leaderboardPuzzleId),
             orderBy('seconds', 'asc')
         );
 
