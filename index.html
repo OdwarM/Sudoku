@@ -71,9 +71,14 @@
 
         <!-- Žebříček -->
         <div class="leaderboard">
-            <h2>🏆 Žebříček — dnešní puzzle</h2>
-            <div id="leaderboard-list">
-                <p class="leaderboard-loading">Načítám výsledky...</p>
+            <button id="leaderboard-toggle" class="leaderboard-toggle">
+                🏆 Žebříček <span id="leaderboard-toggle-icon">▼</span>
+            </button>
+            <div id="leaderboard-body" class="leaderboard-body" style="display:none;">
+                <p id="leaderboard-mode-note" class="leaderboard-mode-note"></p>
+                <div id="leaderboard-list">
+                    <p class="leaderboard-loading">Načítám výsledky...</p>
+                </div>
             </div>
         </div>
     </div>
