@@ -12,7 +12,7 @@ body {
 
 .container {
     background-color: #cfccc8;
-    padding: 8px;
+    padding: 3px;
     border-radius: 10px;
     box-shadow: 0 0 20px rgba(255, 255, 255, 0.05);
     text-align: center;
@@ -483,6 +483,7 @@ h1 {
     margin-bottom: 10px;
     text-align: center;
 }
+
 
 
 
