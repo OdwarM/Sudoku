@@ -7,9 +7,27 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+    <!-- Přihlašovací okno -->
+    <div id="nickname-overlay" class="overlay">
+        <div class="overlay-box">
+            <h2>Vítej ve Sudoku!</h2>
+            <p>Zadej své jméno pro sledování výsledků:</p>
+            <input type="text" id="nickname-input" placeholder="Tvoje jméno..." maxlength="20" />
+            <button id="nickname-confirm-btn">Hrát</button>
+            <p class="overlay-note">Jméno se uloží v prohlížeči, příště se neptáme.</p>
+        </div>
+    </div>
+
     <div class="container">
-        <h1>Sudoku</h1>
-        
+        <div class="top-bar">
+            <h1>Sudoku</h1>
+            <div class="player-info">
+                Hráč: <strong id="player-name-display">—</strong>
+                <button id="change-name-btn" title="Změnit jméno">✏️</button>
+            </div>
+        </div>
+
         <div class="difficulty-controls">
             <label for="difficulty">Obtížnost:</label>
             <select id="difficulty">
@@ -19,27 +37,36 @@
             </select>
         </div>
 
-        <div class="game-area">
-            <div id="sudoku-grid" class="sudoku-grid">
-                </div>
+        <div class="timer-display">
+            <span id="timer">⏱ 00:00</span>
         </div>
 
-        <div id="number-buttons" class="number-buttons">
-            </div>
-			
-		<div class="controls">
-            
-			<button id="delete-numbers">Smazat políčko </button>
+        <div class="game-area">
+            <div id="sudoku-grid" class="sudoku-grid"></div>
+        </div>
+
+        <div id="number-buttons" class="number-buttons"></div>
+
+        <div class="controls">
+            <button id="delete-numbers">Smazat políčko</button>
         </div>
 
         <div class="controls">
             <button id="new-game-btn">Nová Hra</button>
             <button id="check-solution-btn">Zkontrolovat Řešení</button>
-			
         </div>
-		
+
         <p id="message"></p>
+
+        <!-- Žebříček -->
+        <div class="leaderboard">
+            <h2>🏆 Žebříček — dnešní puzzle</h2>
+            <div id="leaderboard-list">
+                <p class="leaderboard-loading">Načítám výsledky...</p>
+            </div>
+        </div>
     </div>
 
-    <script src="script.js"></script>
+    <script type="module" src="script.js"></script>
 </body>
+</html>
