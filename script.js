@@ -2,7 +2,7 @@
 // FIREBASE KONFIGURACE
 // =============================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, query, where, orderBy, onSnapshot, getDocs, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, doc, query, where, orderBy, onSnapshot, getDocs, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDvuIqYsTUiVzgul9EONxOhYJaIR2h4N4g",
@@ -36,10 +36,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const playerNameDisplay      = document.getElementById('player-name-display');
     const changeNameBtn          = document.getElementById('change-name-btn');
     const leaderboardList        = document.getElementById('leaderboard-list');
+    const newgameOverlay         = document.getElementById('newgame-overlay');
+    const newgameCompetitionBtn  = document.getElementById('newgame-competition-btn');
+    const newgameCasualBtn       = document.getElementById('newgame-casual-btn');
+    const newgameCancelBtn       = document.getElementById('newgame-cancel-btn');
 
     // --- STAV HRY ---
     let initialGrid    = [];
     let currentGrid    = [];
+    let frozenNumbers  = new Set(); // Čísla která jsou kompletní a uzamčená
     let selectedCell   = null;
     let activeNumber   = null;
     let timerInterval  = null;
@@ -48,10 +53,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let playerNickname = '';
     let todayPuzzleId  = '';
     let puzzleSeed     = 0;
-    let isChallengeMode = false;   // Hrajeme výzvu (challenge)?
-    let challengeGrid  = null;     // Mřížka výzvy načtená z Firebase
-    let leaderboardUnsubscribe = null; // Pro odpojení listeneru
+    let isCasualMode   = false;  // Mimo soutěž?
+    let casualSeed     = 0;      // Seed pro casual hru
+    let isChallengeMode = false;
+    let challengeGrid  = null;
+    let leaderboardUnsubscribe = null;
 
+    // Upravené obtížnosti
     const DIFFICULTY_MAP = { 'easy': 30, 'medium': 40, 'hard': 50 };
 
     // =============================================
@@ -76,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('sudoku_nickname', name);
         playerNameDisplay.textContent = name;
         nicknameOverlay.style.display = 'none';
-        startNewGame();
+        startCompetitionGame(); // První hra vždy soutěžní
     }
 
     nicknameConfirmBtn.addEventListener('click', confirmNickname);
@@ -87,6 +95,33 @@ document.addEventListener('DOMContentLoaded', () => {
         nicknameInput.style.borderColor = '';
         nicknameOverlay.style.display = 'flex';
         nicknameInput.focus();
+    });
+
+    // =============================================
+    // DIALOG NOVÁ HRA
+    // =============================================
+    newGameBtn.addEventListener('click', () => {
+        newgameOverlay.style.display = 'flex';
+    });
+
+    newgameCompetitionBtn.addEventListener('click', () => {
+        newgameOverlay.style.display = 'none';
+        startCompetitionGame();
+    });
+
+    newgameCasualBtn.addEventListener('click', () => {
+        newgameOverlay.style.display = 'none';
+        startCasualGame();
+    });
+
+    newgameCancelBtn.addEventListener('click', () => {
+        newgameOverlay.style.display = 'none';
+    });
+
+    difficultySelect.addEventListener('change', () => {
+        // Při změně obtížnosti spusť stejný typ hry jako teď
+        if (isCasualMode) startCasualGame();
+        else startCompetitionGame();
     });
 
     // =============================================
@@ -226,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (parseInt(cell.textContent) === num) cell.classList.add('highlighted');
         });
         const btn = document.querySelector(`.number-btn[data-number="${num}"]`);
-        if (btn) btn.classList.add('active');
+        if (btn && !btn.disabled) btn.classList.add('active');
     }
 
     function showMessage(text, type = 'info') {
@@ -234,46 +269,56 @@ document.addEventListener('DOMContentLoaded', () => {
         messageDisplay.style.color = type === 'error' ? '#dc3545' : (type === 'success' ? '#28a745' : '#333');
     }
 
-    // Spočítá kolik je v currentGrid číslo num (včetně fixed)
-    function countNumberInGrid(num) {
+    // Zmrazí číslo — zašedne tlačítko a uzamkne políčka
+    function freezeNumber(num) {
+        frozenNumbers.add(num);
+
+        // Zašedni tlačítko
+        const btn = document.querySelector(`.number-btn[data-number="${num}"]`);
+        if (btn) { btn.classList.add('completed'); btn.disabled = true; }
+
+        // Uzamkni políčka s tímto číslem (i hráčem zadaná → fixed)
+        document.querySelectorAll('.cell').forEach(cell => {
+            if (parseInt(cell.textContent) === num && !cell.classList.contains('fixed')) {
+                cell.classList.add('fixed');
+                cell.classList.remove('player-input', 'invalid');
+            }
+        });
+        // Aktualizuj i initialGrid aby mazání nefungovalo
+        for (let r = 0; r < 9; r++)
+            for (let c = 0; c < 9; c++)
+                if (currentGrid[r][c] === num) initialGrid[r][c] = num;
+
+        if (activeNumber === num) { activeNumber = null; clearNumberHighlights(); }
+    }
+
+    // Po zadání čísla zkontroluj jestli je kompletní a správné
+    function checkNumberComplete(num) {
         let count = 0;
         for (let r = 0; r < 9; r++)
             for (let c = 0; c < 9; c++)
                 if (currentGrid[r][c] === num) count++;
-        return count;
-    }
+        if (count < 9) return;
 
-    // Zkontroluje jestli je číslo správně umístěno ve všech 9 políčcích
-    function checkNumberComplete(num) {
-        if (countNumberInGrid(num) < 9) return; // Ještě není 9 výskytů
+        const solved = solveSudoku(initialGrid.map(row => [...row]));
+        // Použij originální initialGrid před zmrazením pro ověření
+        const solvedCheck = solveSudoku(currentGrid.map((row, r) =>
+            row.map((v, c) => (initialGrid[r][c] !== 0 ? initialGrid[r][c] : 0))
+        ));
 
-        const solved = solveSudoku(initialGrid);
         let allCorrect = true;
         for (let r = 0; r < 9; r++) {
             for (let c = 0; c < 9; c++) {
                 if (currentGrid[r][c] === num && solved[r][c] !== num) {
                     allCorrect = false;
-                    // Označ špatně zadané buňky červeně
-                    if (initialGrid[r][c] === 0) {
-                        sudokuGrid.children[r * 9 + c].classList.add('invalid');
+                    if (!document.querySelectorAll('.cell')[r*9+c].classList.contains('fixed')) {
+                        document.querySelectorAll('.cell')[r*9+c].classList.add('invalid');
                     }
                 }
             }
         }
 
-        if (allCorrect) {
-            // Zašedni tlačítko tohoto čísla
-            const btn = document.querySelector(`.number-btn[data-number="${num}"]`);
-            if (btn) {
-                btn.classList.add('completed');
-                btn.disabled = true;
-            }
-            // Pokud bylo toto číslo aktivní, deaktivuj ho
-            if (activeNumber === num) {
-                activeNumber = null;
-                clearNumberHighlights();
-            }
-        }
+        if (allCorrect) freezeNumber(num);
     }
 
     function renderGrid(grid) {
@@ -301,8 +346,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // =============================================
     // HANDLERY INTERAKCE
     // =============================================
-
-    // Klik na buňku = POUZE výběr, číslo se NEZAPÍŠE
     function handleCellClick(event) {
         const targetCell = event.target;
         messageDisplay.textContent = '';
@@ -315,6 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function writeNumberToCell(num) {
         if (!selectedCell || selectedCell.classList.contains('fixed')) return;
+        if (frozenNumbers.has(num)) return; // Zmrazené číslo nelze přepsat
         const row = parseInt(selectedCell.dataset.row);
         const col = parseInt(selectedCell.dataset.col);
         selectedCell.textContent = num;
@@ -323,11 +367,12 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedCell.classList.add('player-input');
         playSound();
         highlightSameNumbers(num);
-        checkNumberComplete(num); // Zkontroluj jestli je číslo kompletní
+        checkNumberComplete(num);
     }
 
     function createNumberButtons() {
         numberButtonsContainer.innerHTML = '';
+        frozenNumbers.clear();
         for (let i = 1; i <= 9; i++) {
             const button = document.createElement('div');
             button.classList.add('number-btn');
@@ -338,19 +383,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Klik na číselné tlačítko:
-    // - Pokud je buňka vybrána → okamžitě zapíše číslo (bez ohledu na activeNumber)
-    // - Pokud buňka není vybrána → pouze nastaví activeNumber jako štětec
     function handleNumberButtonClick(event) {
         if (event.target.disabled) return;
         const num = parseInt(event.target.dataset.number);
+        if (frozenNumbers.has(num)) return;
 
         if (selectedCell && !selectedCell.classList.contains('fixed')) {
-            // Vždy zapiš číslo do vybrané buňky
             activeNumber = num;
             writeNumberToCell(num);
         } else {
-            // Přepínání štětce (žádná buňka není vybrána)
             if (activeNumber === num) {
                 activeNumber = null;
                 clearNumberHighlights();
@@ -364,9 +405,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleDeleteClick() {
         if (!selectedCell) { showMessage('Nejprve vyberte políčko.', 'error'); return; }
-        if (selectedCell.classList.contains('fixed')) { showMessage('Nelze mazat původní číslo.', 'error'); return; }
+        if (selectedCell.classList.contains('fixed')) { showMessage('Nelze mazat toto políčko.', 'error'); return; }
         const row = parseInt(selectedCell.dataset.row);
         const col = parseInt(selectedCell.dataset.col);
+        if (frozenNumbers.has(currentGrid[row][col])) {
+            showMessage('Toto číslo je již kompletní a uzamčené.', 'error'); return;
+        }
         currentGrid[row][col] = 0;
         selectedCell.textContent = '';
         selectedCell.classList.remove('player-input', 'invalid');
@@ -383,9 +427,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const col = parseInt(selectedCell.dataset.col);
         if (key >= '1' && key <= '9') {
             const num = parseInt(key);
+            if (frozenNumbers.has(num)) return;
             activeNumber = num;
             writeNumberToCell(num);
         } else if (key === 'Backspace' || key === 'Delete') {
+            if (frozenNumbers.has(currentGrid[row][col])) return;
             currentGrid[row][col] = 0;
             selectedCell.textContent = '';
             selectedCell.classList.remove('player-input', 'invalid');
@@ -418,9 +464,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const m = String(Math.floor(timerSeconds/60)).padStart(2,'0');
             const s = String(timerSeconds%60).padStart(2,'0');
             showMessage(`🎉 Gratulujeme! Vyřešeno za ${m}:${s}!`, 'success');
-            saveResultToFirebase(timerSeconds);
-            // Po vyřešení nabídni uložení jako výzvu (pokud jsou v žebříčku ≥2 hráči)
-            checkOfferSaveChallenge();
+
+            if (isCasualMode) {
+                // Casual — nabídni uložit jako výzvu
+                setTimeout(() => {
+                    const answer = confirm('Uložit tuto hru jako novou výzvu pro ostatní hráče?\n(Původní výzva bude nahrazena.)');
+                    if (answer) saveChallenge();
+                }, 800);
+            } else {
+                // Soutěžní — zkontroluj jestli hráč ještě nemá výsledek uložen
+                saveResultToFirebase(timerSeconds);
+                checkOfferSaveChallenge();
+            }
         } else {
             showMessage('Zkontrolujte zvýrazněné (červené) buňky.', 'error');
         }
@@ -428,6 +483,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function saveResultToFirebase(seconds) {
         try {
+            // Zkontroluj jestli hráč již nemá výsledek pro toto puzzle
+            const q = query(collection(db, 'results'),
+                where('puzzleId', '==', todayPuzzleId),
+                where('nickname', '==', playerNickname));
+            const existing = await getDocs(q);
+            if (!existing.empty) {
+                showMessage('🎉 Skvělé! Tvůj výsledek byl již dříve uložen.', 'success');
+                return;
+            }
             await addDoc(collection(db, 'results'), {
                 puzzleId: todayPuzzleId,
                 nickname: playerNickname,
@@ -440,16 +504,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // =============================================
     // VÝZVA (CHALLENGE)
     // =============================================
-
-    // Načte aktuální výzvu z Firebase
     async function loadChallenge() {
         try {
             const challengeDoc = await getDoc(doc(db, 'challenge', 'current'));
             return challengeDoc.exists() ? challengeDoc.data() : null;
-        } catch (e) { console.error('Chyba při načítání výzvy:', e); return null; }
+        } catch (e) { return null; }
     }
 
-    // Uloží aktuální hru jako výzvu
     async function saveChallenge() {
         try {
             await setDoc(doc(db, 'challenge', 'current'), {
@@ -463,7 +524,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { console.error('Chyba při ukládání výzvy:', e); }
     }
 
-    // Po dokončení hry zkontroluje, jestli jsou ≥2 hráči v žebříčku → nabídne uložení výzvy
     async function checkOfferSaveChallenge() {
         try {
             const q = query(collection(db, 'results'), where('puzzleId', '==', todayPuzzleId));
@@ -481,8 +541,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // ŽEBŘÍČEK
     // =============================================
     function listenLeaderboard() {
-        // Odpoj předchozí listener
         if (leaderboardUnsubscribe) { leaderboardUnsubscribe(); leaderboardUnsubscribe = null; }
+        if (isCasualMode) {
+            leaderboardList.innerHTML = '<p class="leaderboard-empty">Hra mimo soutěž — výsledky se neukládají.</p>';
+            return;
+        }
 
         const q = query(
             collection(db, 'results'),
@@ -493,11 +556,10 @@ document.addEventListener('DOMContentLoaded', () => {
         leaderboardUnsubscribe = onSnapshot(q, async (snapshot) => {
             leaderboardList.innerHTML = '';
 
-            // Tlačítko výzvy — zobraz vždy nahoře
+            // Tlačítko výzvy nahoře
             const challengeData = await loadChallenge();
             if (challengeData) {
                 const challengeBtn = document.createElement('button');
-                challengeBtn.id = 'accept-challenge-btn';
                 challengeBtn.className = 'challenge-btn';
                 challengeBtn.innerHTML = `⚔️ Přijmout výzvu od <strong>${challengeData.createdBy}</strong>`;
                 challengeBtn.addEventListener('click', () => acceptChallenge(challengeData));
@@ -530,11 +592,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Přijme výzvu — načte uloženou mřížku a spustí hru s ní
     function acceptChallenge(challengeData) {
         const answer = confirm(`Přijmout výzvu od hráče ${challengeData.createdBy}?\nBudeš hrát stejné sudoku jako on/ona.`);
         if (!answer) return;
         isChallengeMode = true;
+        isCasualMode = false;
         challengeGrid = challengeData.grid;
         todayPuzzleId = challengeData.puzzleId;
 
@@ -545,43 +607,83 @@ document.addEventListener('DOMContentLoaded', () => {
 
         initialGrid = challengeGrid.map(row => [...row]);
         currentGrid = initialGrid.map(row => [...row]);
+        createNumberButtons();
         renderGrid(currentGrid);
         startTimer();
-        createNumberButtons(); // Reset tlačítek (odstraní completed stav)
-        showMessage(`⚔️ Výzva přijata! Hraje stejné puzzle jako ${challengeData.createdBy}.`, 'info');
+        showMessage(`⚔️ Výzva přijata! Hraješ stejné puzzle jako ${challengeData.createdBy}.`, 'info');
         listenLeaderboard();
     }
 
     // =============================================
-    // NOVÁ HRA
+    // NOVÁ HRA — SOUTĚŽNÍ
     // =============================================
-    function startNewGame() {
+    async function startCompetitionGame() {
+        const difficulty = difficultySelect.value;
+        const puzzleId = getTodayPuzzleId(difficulty);
+
+        // Zkontroluj jestli hráč již má výsledek pro dnešní puzzle
+        try {
+            const q = query(collection(db, 'results'),
+                where('puzzleId', '==', puzzleId),
+                where('nickname', '==', playerNickname));
+            const existing = await getDocs(q);
+            if (!existing.empty) {
+                // Hráč již hrál — zobraz zprávu a nabídni casual
+                showMessage('⚠️ Dnešní soutěžní hru jsi již dokončil. Spouštím nové náhodné zadání...', 'info');
+                setTimeout(() => startCasualGame(), 1500);
+                return;
+            }
+        } catch (e) { console.error(e); }
+
+        // Spusť soutěžní hru
+        isCasualMode = false;
+        isChallengeMode = false;
         messageDisplay.textContent = '';
         if (selectedCell) { selectedCell.classList.remove('selected'); selectedCell = null; }
         activeNumber = null;
-        isChallengeMode = false;
-        challengeGrid = null;
         clearNumberHighlights();
 
-        const difficulty = difficultySelect.value;
-        todayPuzzleId = getTodayPuzzleId(difficulty);
+        todayPuzzleId = puzzleId;
         puzzleSeed = hashCode(todayPuzzleId);
 
         initialGrid = generateSudokuWithSeed(difficulty, puzzleSeed);
         currentGrid = initialGrid.map(row => [...row]);
+        createNumberButtons();
         renderGrid(currentGrid);
         startTimer();
-        createNumberButtons(); // Reset tlačítek
         listenLeaderboard();
+        showMessage('🏆 Soutěžní hra — výsledek půjde do žebříčku.', 'info');
+    }
+
+    // =============================================
+    // NOVÁ HRA — MIMO SOUTĚŽ (CASUAL)
+    // =============================================
+    function startCasualGame() {
+        isCasualMode = true;
+        isChallengeMode = false;
+        messageDisplay.textContent = '';
+        if (selectedCell) { selectedCell.classList.remove('selected'); selectedCell = null; }
+        activeNumber = null;
+        clearNumberHighlights();
+
+        const difficulty = difficultySelect.value;
+        // Náhodný seed pro casual hru (jiný každý spuštění)
+        casualSeed = Math.floor(Math.random() * 9999999);
+        todayPuzzleId = `casual_${casualSeed}`;
+
+        initialGrid = generateSudokuWithSeed(difficulty, casualSeed);
+        currentGrid = initialGrid.map(row => [...row]);
+        createNumberButtons();
+        renderGrid(currentGrid);
+        startTimer();
+        listenLeaderboard(); // Zobrazí "Hra mimo soutěž"
+        showMessage('🎲 Hra mimo soutěž — výsledek se neukládá do žebříčku.', 'info');
     }
 
     // --- Spuštění ---
-    newGameBtn.addEventListener('click', startNewGame);
     checkSolutionBtn.addEventListener('click', checkSolution);
-    difficultySelect.addEventListener('change', startNewGame);
     deleteNumbersBtn.addEventListener('click', handleDeleteClick);
     createNumberButtons();
     initNickname();
-    if (localStorage.getItem('sudoku_nickname')) startNewGame();
+    if (localStorage.getItem('sudoku_nickname')) startCompetitionGame();
 });
-
