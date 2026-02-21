@@ -46,9 +46,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const newgameCancelBtn       = document.getElementById('newgame-cancel-btn');
 
     // --- STAV HRY ---
-    let initialGrid    = [];
+    let initialGrid    = [];   // Původní zadání hry (pouze zadaná čísla, nikdy se nemění)
+    let solvedGrid     = [];   // Správné řešení (vypočítá se jednou na začátku hry)
     let currentGrid    = [];
-    let frozenNumbers  = new Set(); // Čísla která jsou kompletní a uzamčená
+    let frozenNumbers  = new Set();
     let selectedCell   = null;
     let activeNumber   = null;
     let timerInterval  = null;
@@ -288,22 +289,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const btn = document.querySelector(`.number-btn[data-number="${num}"]`);
         if (btn) { btn.classList.add('completed'); btn.disabled = true; }
 
-        // Uzamkni políčka s tímto číslem (i hráčem zadaná → fixed)
+        // Uzamkni políčka s tímto číslem vizuálně (fixed styl)
         document.querySelectorAll('.cell').forEach(cell => {
             if (parseInt(cell.textContent) === num && !cell.classList.contains('fixed')) {
                 cell.classList.add('fixed');
                 cell.classList.remove('player-input', 'invalid');
             }
         });
-        // Aktualizuj i initialGrid aby mazání nefungovalo
-        for (let r = 0; r < 9; r++)
-            for (let c = 0; c < 9; c++)
-                if (currentGrid[r][c] === num) initialGrid[r][c] = num;
 
         if (activeNumber === num) { activeNumber = null; clearNumberHighlights(); }
     }
 
     // Po zadání čísla zkontroluj jestli je kompletní a správné
+    // Používá solvedGrid který se vypočítá jednou na začátku — initialGrid se nikdy nemění
     function checkNumberComplete(num) {
         let count = 0;
         for (let r = 0; r < 9; r++)
@@ -311,20 +309,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (currentGrid[r][c] === num) count++;
         if (count < 9) return;
 
-        const solved = solveSudoku(initialGrid.map(row => [...row]));
-        // Použij originální initialGrid před zmrazením pro ověření
-        const solvedCheck = solveSudoku(currentGrid.map((row, r) =>
-            row.map((v, c) => (initialGrid[r][c] !== 0 ? initialGrid[r][c] : 0))
-        ));
-
         let allCorrect = true;
         for (let r = 0; r < 9; r++) {
             for (let c = 0; c < 9; c++) {
-                if (currentGrid[r][c] === num && solved[r][c] !== num) {
+                if (currentGrid[r][c] === num && solvedGrid[r][c] !== num) {
                     allCorrect = false;
-                    if (!document.querySelectorAll('.cell')[r*9+c].classList.contains('fixed')) {
-                        document.querySelectorAll('.cell')[r*9+c].classList.add('invalid');
-                    }
+                    const cell = sudokuGrid.children[r * 9 + c];
+                    if (!cell.classList.contains('fixed')) cell.classList.add('invalid');
                 }
             }
         }
@@ -456,14 +447,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // KONTROLA ŘEŠENÍ + ULOŽENÍ DO FIREBASE
     // =============================================
     function checkSolution() {
-        const solved = solveSudoku(initialGrid);
         let isCorrect = true;
         for (let r = 0; r < 9; r++) {
             for (let c = 0; c < 9; c++) {
                 const cellElement = sudokuGrid.children[r * 9 + c];
                 cellElement.classList.remove('invalid');
                 if (currentGrid[r][c] === 0) { isCorrect = false; continue; }
-                if (currentGrid[r][c] !== solved[r][c]) {
+                if (currentGrid[r][c] !== solvedGrid[r][c]) {
                     isCorrect = false;
                     if (!cellElement.classList.contains('fixed')) cellElement.classList.add('invalid');
                 }
@@ -633,6 +623,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearNumberHighlights();
 
         initialGrid = challengeGrid.map(row => [...row]);
+        solvedGrid  = solveSudoku(initialGrid.map(row => [...row]));
         currentGrid = initialGrid.map(row => [...row]);
         createNumberButtons();
         renderGrid(currentGrid);
@@ -674,6 +665,7 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleSeed = hashCode(todayPuzzleId);
 
         initialGrid = generateSudokuWithSeed(difficulty, puzzleSeed);
+        solvedGrid  = solveSudoku(initialGrid.map(row => [...row]));
         currentGrid = initialGrid.map(row => [...row]);
         createNumberButtons();
         renderGrid(currentGrid);
@@ -699,6 +691,7 @@ document.addEventListener('DOMContentLoaded', () => {
         todayPuzzleId = `casual_${casualSeed}`;
 
         initialGrid = generateSudokuWithSeed(difficulty, casualSeed);
+        solvedGrid  = solveSudoku(initialGrid.map(row => [...row]));
         currentGrid = initialGrid.map(row => [...row]);
         createNumberButtons();
         renderGrid(currentGrid);
