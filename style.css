@@ -357,3 +357,45 @@ h1 {
     text-align: center;
     padding: 10px 0;
 }
+
+/* =============================================
+   DOKONČENÉ ČÍSLO — zašedlé tlačítko
+   ============================================= */
+.number-btn.completed {
+    background-color: #ced4da;
+    color: #aaa;
+    cursor: not-allowed;
+    box-shadow: none;
+    border-color: #ced4da;
+}
+
+.number-btn.completed:hover {
+    background-color: #ced4da;
+}
+
+/* =============================================
+   TLAČÍTKO VÝZVY v žebříčku
+   ============================================= */
+.challenge-btn {
+    display: block;
+    width: 100%;
+    margin-bottom: 14px;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, #ff6b35, #f7931e);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95em;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    text-align: center;
+}
+
+.challenge-btn:hover {
+    opacity: 0.9;
+    transform: scale(1.02);
+}
+
+.challenge-btn strong {
+    font-weight: bold;
+}
