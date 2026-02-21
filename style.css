@@ -54,7 +54,7 @@ h1 {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: clamp(1.2em, 4vw, 1.5em);
+    font-size: clamp(1.2em, 6vw, 1.5em);
     font-weight: bold;
     border: 1px solid #ccc;
     background-color: #fff;
@@ -483,4 +483,5 @@ h1 {
     margin-bottom: 10px;
     text-align: center;
 }
+
 
