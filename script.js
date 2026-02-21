@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let challengeGrid  = null;     // Mřížka výzvy načtená z Firebase
     let leaderboardUnsubscribe = null; // Pro odpojení listeneru
 
-    const DIFFICULTY_MAP = { 'easy': 40, 'medium': 50, 'hard': 60 };
+    const DIFFICULTY_MAP = { 'easy': 30, 'medium': 40, 'hard': 50 };
 
     // =============================================
     // NICKNAME
@@ -584,3 +584,4 @@ document.addEventListener('DOMContentLoaded', () => {
     initNickname();
     if (localStorage.getItem('sudoku_nickname')) startNewGame();
 });
+
