@@ -2,7 +2,7 @@
 // FIREBASE KONFIGURACE
 // =============================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, query, where, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, query, where, orderBy, onSnapshot, getDocs, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDvuIqYsTUiVzgul9EONxOhYJaIR2h4N4g",
@@ -22,37 +22,40 @@ const db = getFirestore(app);
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- ELEMENTY ---
-    const sudokuGrid       = document.getElementById('sudoku-grid');
-    const newGameBtn       = document.getElementById('new-game-btn');
-    const checkSolutionBtn = document.getElementById('check-solution-btn');
-    const messageDisplay   = document.getElementById('message');
-    const difficultySelect = document.getElementById('difficulty');
+    const sudokuGrid             = document.getElementById('sudoku-grid');
+    const newGameBtn             = document.getElementById('new-game-btn');
+    const checkSolutionBtn       = document.getElementById('check-solution-btn');
+    const messageDisplay         = document.getElementById('message');
+    const difficultySelect       = document.getElementById('difficulty');
     const numberButtonsContainer = document.getElementById('number-buttons');
-    const timerDisplay     = document.getElementById('timer');
-    const deleteNumbersBtn = document.getElementById('delete-numbers');
-    const nicknameOverlay  = document.getElementById('nickname-overlay');
-    const nicknameInput    = document.getElementById('nickname-input');
-    const nicknameConfirmBtn = document.getElementById('nickname-confirm-btn');
-    const playerNameDisplay  = document.getElementById('player-name-display');
-    const changeNameBtn      = document.getElementById('change-name-btn');
-    const leaderboardList    = document.getElementById('leaderboard-list');
+    const timerDisplay           = document.getElementById('timer');
+    const deleteNumbersBtn       = document.getElementById('delete-numbers');
+    const nicknameOverlay        = document.getElementById('nickname-overlay');
+    const nicknameInput          = document.getElementById('nickname-input');
+    const nicknameConfirmBtn     = document.getElementById('nickname-confirm-btn');
+    const playerNameDisplay      = document.getElementById('player-name-display');
+    const changeNameBtn          = document.getElementById('change-name-btn');
+    const leaderboardList        = document.getElementById('leaderboard-list');
 
     // --- STAV HRY ---
-    let initialGrid  = [];
-    let currentGrid  = [];
-    let selectedCell = null;
-    let activeNumber = null;
-    let timerInterval = null;
-    let timerSeconds  = 0;
-    let timerRunning  = false;
+    let initialGrid    = [];
+    let currentGrid    = [];
+    let selectedCell   = null;
+    let activeNumber   = null;
+    let timerInterval  = null;
+    let timerSeconds   = 0;
+    let timerRunning   = false;
     let playerNickname = '';
-    let todayPuzzleId  = '';   // ID dnešního puzzle (datum + obtížnost)
-    let puzzleSeed     = 0;    // Seed pro generování stejného puzzle pro všechny
+    let todayPuzzleId  = '';
+    let puzzleSeed     = 0;
+    let isChallengeMode = false;   // Hrajeme výzvu (challenge)?
+    let challengeGrid  = null;     // Mřížka výzvy načtená z Firebase
+    let leaderboardUnsubscribe = null; // Pro odpojení listeneru
 
     const DIFFICULTY_MAP = { 'easy': 40, 'medium': 50, 'hard': 60 };
 
     // =============================================
-    // NICKNAME — PŘIHLÁŠENÍ
+    // NICKNAME
     // =============================================
     function initNickname() {
         const saved = localStorage.getItem('sudoku_nickname');
@@ -68,10 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function confirmNickname() {
         const name = nicknameInput.value.trim();
-        if (!name) {
-            nicknameInput.style.borderColor = '#dc3545';
-            return;
-        }
+        if (!name) { nicknameInput.style.borderColor = '#dc3545'; return; }
         playerNickname = name;
         localStorage.setItem('sudoku_nickname', name);
         playerNameDisplay.textContent = name;
@@ -81,7 +81,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     nicknameConfirmBtn.addEventListener('click', confirmNickname);
     nicknameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') confirmNickname(); });
-
     changeNameBtn.addEventListener('click', () => {
         localStorage.removeItem('sudoku_nickname');
         nicknameInput.value = '';
@@ -91,15 +90,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // =============================================
-    // PUZZLE ID — stejné zadání pro všechny hráče
+    // PUZZLE ID + SEED
     // =============================================
     function getTodayPuzzleId(difficulty) {
         const today = new Date();
-        const dateStr = `${today.getFullYear()}-${today.getMonth()+1}-${today.getDate()}`;
-        return `${dateStr}_${difficulty}`;
+        return `${today.getFullYear()}-${today.getMonth()+1}-${today.getDate()}_${difficulty}`;
     }
 
-    // Jednoduchý deterministický seed z řetězce
     function hashCode(str) {
         let hash = 0;
         for (let i = 0; i < str.length; i++) {
@@ -109,7 +106,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return Math.abs(hash);
     }
 
-    // Seeded pseudonáhodný generátor (Mulberry32)
     function makeRng(seed) {
         let s = seed;
         return function() {
@@ -121,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =============================================
-    // LOGIKA SUDOKU (s podporou seedu)
+    // LOGIKA SUDOKU
     // =============================================
     function generateEmptyGrid() {
         return Array(9).fill(null).map(() => Array(9).fill(0));
@@ -173,7 +169,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function generateSudokuWithSeed(difficulty, seed) {
         const rng = makeRng(seed);
         let grid = generateEmptyGrid();
-
         function fillBox(g, row, col) {
             let nums = [1,2,3,4,5,6,7,8,9];
             shuffleArrayWithRng(nums, rng);
@@ -181,42 +176,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 for (let c = 0; c < 3; c++)
                     g[row+r][col+c] = nums.pop();
         }
-
-        fillBox(grid, 0, 0);
-        fillBox(grid, 3, 3);
-        fillBox(grid, 6, 6);
+        fillBox(grid, 0, 0); fillBox(grid, 3, 3); fillBox(grid, 6, 6);
         grid = solveSudoku(grid);
-
         if (!grid || grid[0][0] === 0) return generateSudokuWithSeed(difficulty, seed + 1);
-
         const cellsToRemove = DIFFICULTY_MAP[difficulty];
         let cells = Array.from({length: 81}, (_, i) => i);
         shuffleArrayWithRng(cells, rng);
-        for (let i = 0; i < cellsToRemove; i++) {
-            grid[Math.floor(cells[i]/9)][cells[i]%9] = 0;
-        }
+        for (let i = 0; i < cellsToRemove; i++) grid[Math.floor(cells[i]/9)][cells[i]%9] = 0;
         return grid;
     }
 
     // =============================================
     // ČASOVAČ
     // =============================================
-    function formatTime(seconds) {
-        const m = String(Math.floor(seconds / 60)).padStart(2, '0');
-        const s = String(seconds % 60).padStart(2, '0');
-        return `⏱ ${m}:${s}`;
+    function formatTime(s) {
+        return `⏱ ${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
     }
 
     function startTimer() {
         stopTimer();
-        timerSeconds = 0;
-        timerRunning = true;
+        timerSeconds = 0; timerRunning = true;
         timerDisplay.textContent = formatTime(0);
         timerDisplay.classList.remove('finished');
-        timerInterval = setInterval(() => {
-            timerSeconds++;
-            timerDisplay.textContent = formatTime(timerSeconds);
-        }, 1000);
+        timerInterval = setInterval(() => { timerSeconds++; timerDisplay.textContent = formatTime(timerSeconds); }, 1000);
     }
 
     function stopTimer() {
@@ -252,6 +234,48 @@ document.addEventListener('DOMContentLoaded', () => {
         messageDisplay.style.color = type === 'error' ? '#dc3545' : (type === 'success' ? '#28a745' : '#333');
     }
 
+    // Spočítá kolik je v currentGrid číslo num (včetně fixed)
+    function countNumberInGrid(num) {
+        let count = 0;
+        for (let r = 0; r < 9; r++)
+            for (let c = 0; c < 9; c++)
+                if (currentGrid[r][c] === num) count++;
+        return count;
+    }
+
+    // Zkontroluje jestli je číslo správně umístěno ve všech 9 políčcích
+    function checkNumberComplete(num) {
+        if (countNumberInGrid(num) < 9) return; // Ještě není 9 výskytů
+
+        const solved = solveSudoku(initialGrid);
+        let allCorrect = true;
+        for (let r = 0; r < 9; r++) {
+            for (let c = 0; c < 9; c++) {
+                if (currentGrid[r][c] === num && solved[r][c] !== num) {
+                    allCorrect = false;
+                    // Označ špatně zadané buňky červeně
+                    if (initialGrid[r][c] === 0) {
+                        sudokuGrid.children[r * 9 + c].classList.add('invalid');
+                    }
+                }
+            }
+        }
+
+        if (allCorrect) {
+            // Zašedni tlačítko tohoto čísla
+            const btn = document.querySelector(`.number-btn[data-number="${num}"]`);
+            if (btn) {
+                btn.classList.add('completed');
+                btn.disabled = true;
+            }
+            // Pokud bylo toto číslo aktivní, deaktivuj ho
+            if (activeNumber === num) {
+                activeNumber = null;
+                clearNumberHighlights();
+            }
+        }
+    }
+
     function renderGrid(grid) {
         sudokuGrid.innerHTML = '';
         grid.forEach((row, rowIndex) => {
@@ -274,6 +298,11 @@ document.addEventListener('DOMContentLoaded', () => {
         highlightSameNumbers(activeNumber);
     }
 
+    // =============================================
+    // HANDLERY INTERAKCE
+    // =============================================
+
+    // Klik na buňku = POUZE výběr, číslo se NEZAPÍŠE
     function handleCellClick(event) {
         const targetCell = event.target;
         messageDisplay.textContent = '';
@@ -282,6 +311,19 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedCell.classList.add('selected');
         const cellValue = parseInt(targetCell.textContent);
         highlightSameNumbers(cellValue >= 1 && cellValue <= 9 ? cellValue : activeNumber);
+    }
+
+    function writeNumberToCell(num) {
+        if (!selectedCell || selectedCell.classList.contains('fixed')) return;
+        const row = parseInt(selectedCell.dataset.row);
+        const col = parseInt(selectedCell.dataset.col);
+        selectedCell.textContent = num;
+        currentGrid[row][col] = num;
+        selectedCell.classList.remove('invalid');
+        selectedCell.classList.add('player-input');
+        playSound();
+        highlightSameNumbers(num);
+        checkNumberComplete(num); // Zkontroluj jestli je číslo kompletní
     }
 
     function createNumberButtons() {
@@ -296,24 +338,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Klik na číselné tlačítko:
+    // - Pokud je buňka vybrána → okamžitě zapíše číslo (bez ohledu na activeNumber)
+    // - Pokud buňka není vybrána → pouze nastaví activeNumber jako štětec
     function handleNumberButtonClick(event) {
+        if (event.target.disabled) return;
         const num = parseInt(event.target.dataset.number);
-        if (activeNumber === num) {
-            activeNumber = null;
-            clearNumberHighlights();
-            return;
-        }
-        activeNumber = num;
-        highlightSameNumbers(activeNumber);
-        playSound();
+
         if (selectedCell && !selectedCell.classList.contains('fixed')) {
-            const row = parseInt(selectedCell.dataset.row);
-            const col = parseInt(selectedCell.dataset.col);
-            selectedCell.textContent = activeNumber;
-            currentGrid[row][col] = activeNumber;
-            selectedCell.classList.remove('invalid');
-            selectedCell.classList.add('player-input');
-            highlightSameNumbers(activeNumber);
+            // Vždy zapiš číslo do vybrané buňky
+            activeNumber = num;
+            writeNumberToCell(num);
+        } else {
+            // Přepínání štětce (žádná buňka není vybrána)
+            if (activeNumber === num) {
+                activeNumber = null;
+                clearNumberHighlights();
+            } else {
+                activeNumber = num;
+                highlightSameNumbers(num);
+                playSound();
+            }
         }
     }
 
@@ -336,20 +381,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const key = event.key;
         const row = parseInt(selectedCell.dataset.row);
         const col = parseInt(selectedCell.dataset.col);
-        activeNumber = null;
-        clearNumberHighlights();
         if (key >= '1' && key <= '9') {
             const num = parseInt(key);
-            selectedCell.textContent = num;
-            currentGrid[row][col] = num;
-            selectedCell.classList.remove('invalid');
-            selectedCell.classList.add('player-input');
-            playSound();
-            highlightSameNumbers(num);
+            activeNumber = num;
+            writeNumberToCell(num);
         } else if (key === 'Backspace' || key === 'Delete') {
-            selectedCell.textContent = '';
             currentGrid[row][col] = 0;
+            selectedCell.textContent = '';
             selectedCell.classList.remove('player-input', 'invalid');
+            activeNumber = null;
+            clearNumberHighlights();
             playSound();
         }
     });
@@ -358,14 +399,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // KONTROLA ŘEŠENÍ + ULOŽENÍ DO FIREBASE
     // =============================================
     function checkSolution() {
-        const solvedInitialGrid = solveSudoku(initialGrid);
+        const solved = solveSudoku(initialGrid);
         let isCorrect = true;
         for (let r = 0; r < 9; r++) {
             for (let c = 0; c < 9; c++) {
                 const cellElement = sudokuGrid.children[r * 9 + c];
                 cellElement.classList.remove('invalid');
                 if (currentGrid[r][c] === 0) { isCorrect = false; continue; }
-                if (currentGrid[r][c] !== solvedInitialGrid[r][c]) {
+                if (currentGrid[r][c] !== solved[r][c]) {
                     isCorrect = false;
                     if (!cellElement.classList.contains('fixed')) cellElement.classList.add('invalid');
                 }
@@ -374,10 +415,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isCorrect) {
             stopTimer();
             timerDisplay.classList.add('finished');
-            const m = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
-            const s = String(timerSeconds % 60).padStart(2, '0');
+            const m = String(Math.floor(timerSeconds/60)).padStart(2,'0');
+            const s = String(timerSeconds%60).padStart(2,'0');
             showMessage(`🎉 Gratulujeme! Vyřešeno za ${m}:${s}!`, 'success');
             saveResultToFirebase(timerSeconds);
+            // Po vyřešení nabídni uložení jako výzvu (pokud jsou v žebříčku ≥2 hráči)
+            checkOfferSaveChallenge();
         } else {
             showMessage('Zkontrolujte zvýrazněné (červené) buňky.', 'error');
         }
@@ -391,42 +434,122 @@ document.addEventListener('DOMContentLoaded', () => {
                 seconds: seconds,
                 timestamp: new Date()
             });
-        } catch (e) {
-            console.error('Chyba při ukládání výsledku:', e);
-        }
+        } catch (e) { console.error('Chyba při ukládání výsledku:', e); }
+    }
+
+    // =============================================
+    // VÝZVA (CHALLENGE)
+    // =============================================
+
+    // Načte aktuální výzvu z Firebase
+    async function loadChallenge() {
+        try {
+            const challengeDoc = await getDoc(doc(db, 'challenge', 'current'));
+            return challengeDoc.exists() ? challengeDoc.data() : null;
+        } catch (e) { console.error('Chyba při načítání výzvy:', e); return null; }
+    }
+
+    // Uloží aktuální hru jako výzvu
+    async function saveChallenge() {
+        try {
+            await setDoc(doc(db, 'challenge', 'current'), {
+                puzzleId: todayPuzzleId,
+                grid: initialGrid.map(row => [...row]),
+                difficulty: difficultySelect.value,
+                createdBy: playerNickname,
+                createdAt: new Date()
+            });
+            showMessage('✅ Hra uložena jako výzva pro ostatní hráče!', 'success');
+        } catch (e) { console.error('Chyba při ukládání výzvy:', e); }
+    }
+
+    // Po dokončení hry zkontroluje, jestli jsou ≥2 hráči v žebříčku → nabídne uložení výzvy
+    async function checkOfferSaveChallenge() {
+        try {
+            const q = query(collection(db, 'results'), where('puzzleId', '==', todayPuzzleId));
+            const snap = await getDocs(q);
+            if (snap.size >= 2) {
+                setTimeout(() => {
+                    const answer = confirm('Uložit tuto hru jako novou výzvu pro ostatní hráče?\n(Původní výzva bude nahrazena.)');
+                    if (answer) saveChallenge();
+                }, 800);
+            }
+        } catch (e) { console.error(e); }
     }
 
     // =============================================
     // ŽEBŘÍČEK
     // =============================================
     function listenLeaderboard() {
+        // Odpoj předchozí listener
+        if (leaderboardUnsubscribe) { leaderboardUnsubscribe(); leaderboardUnsubscribe = null; }
+
         const q = query(
             collection(db, 'results'),
             where('puzzleId', '==', todayPuzzleId),
             orderBy('seconds', 'asc')
         );
-        onSnapshot(q, (snapshot) => {
+
+        leaderboardUnsubscribe = onSnapshot(q, async (snapshot) => {
             leaderboardList.innerHTML = '';
+
+            // Tlačítko výzvy — zobraz vždy nahoře
+            const challengeData = await loadChallenge();
+            if (challengeData) {
+                const challengeBtn = document.createElement('button');
+                challengeBtn.id = 'accept-challenge-btn';
+                challengeBtn.className = 'challenge-btn';
+                challengeBtn.innerHTML = `⚔️ Přijmout výzvu od <strong>${challengeData.createdBy}</strong>`;
+                challengeBtn.addEventListener('click', () => acceptChallenge(challengeData));
+                leaderboardList.appendChild(challengeBtn);
+            }
+
             if (snapshot.empty) {
-                leaderboardList.innerHTML = '<p class="leaderboard-empty">Zatím žádné výsledky. Buď první! 🚀</p>';
+                const empty = document.createElement('p');
+                empty.className = 'leaderboard-empty';
+                empty.textContent = 'Zatím žádné výsledky. Buď první! 🚀';
+                leaderboardList.appendChild(empty);
                 return;
             }
+
             const medals = ['🥇', '🥈', '🥉'];
-            snapshot.forEach((doc, index) => {
-                const data = doc.data();
-                const m = String(Math.floor(data.seconds / 60)).padStart(2, '0');
-                const s = String(data.seconds % 60).padStart(2, '0');
+            snapshot.forEach((docSnap, index) => {
+                const data = docSnap.data();
+                const m = String(Math.floor(data.seconds/60)).padStart(2,'0');
+                const s = String(data.seconds%60).padStart(2,'0');
                 const row = document.createElement('div');
                 row.classList.add('leaderboard-row');
                 if (data.nickname === playerNickname) row.classList.add('leaderboard-me');
                 row.innerHTML = `
-                    <span class="lb-rank">${medals[index] || (index + 1) + '.'}</span>
+                    <span class="lb-rank">${medals[index] || (index+1)+'.'}  </span>
                     <span class="lb-name">${data.nickname}</span>
                     <span class="lb-time">${m}:${s}</span>
                 `;
                 leaderboardList.appendChild(row);
             });
         });
+    }
+
+    // Přijme výzvu — načte uloženou mřížku a spustí hru s ní
+    function acceptChallenge(challengeData) {
+        const answer = confirm(`Přijmout výzvu od hráče ${challengeData.createdBy}?\nBudeš hrát stejné sudoku jako on/ona.`);
+        if (!answer) return;
+        isChallengeMode = true;
+        challengeGrid = challengeData.grid;
+        todayPuzzleId = challengeData.puzzleId;
+
+        messageDisplay.textContent = '';
+        if (selectedCell) { selectedCell.classList.remove('selected'); selectedCell = null; }
+        activeNumber = null;
+        clearNumberHighlights();
+
+        initialGrid = challengeGrid.map(row => [...row]);
+        currentGrid = initialGrid.map(row => [...row]);
+        renderGrid(currentGrid);
+        startTimer();
+        createNumberButtons(); // Reset tlačítek (odstraní completed stav)
+        showMessage(`⚔️ Výzva přijata! Hraje stejné puzzle jako ${challengeData.createdBy}.`, 'info');
+        listenLeaderboard();
     }
 
     // =============================================
@@ -436,6 +559,8 @@ document.addEventListener('DOMContentLoaded', () => {
         messageDisplay.textContent = '';
         if (selectedCell) { selectedCell.classList.remove('selected'); selectedCell = null; }
         activeNumber = null;
+        isChallengeMode = false;
+        challengeGrid = null;
         clearNumberHighlights();
 
         const difficulty = difficultySelect.value;
@@ -446,6 +571,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentGrid = initialGrid.map(row => [...row]);
         renderGrid(currentGrid);
         startTimer();
+        createNumberButtons(); // Reset tlačítek
         listenLeaderboard();
     }
 
@@ -456,9 +582,5 @@ document.addEventListener('DOMContentLoaded', () => {
     deleteNumbersBtn.addEventListener('click', handleDeleteClick);
     createNumberButtons();
     initNickname();
-
-    // Pokud je nickname uložen, spusť hru hned
-    if (localStorage.getItem('sudoku_nickname')) {
-        startNewGame();
-    }
+    if (localStorage.getItem('sudoku_nickname')) startNewGame();
 });
