@@ -36,6 +36,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const playerNameDisplay      = document.getElementById('player-name-display');
     const changeNameBtn          = document.getElementById('change-name-btn');
     const leaderboardList        = document.getElementById('leaderboard-list');
+    const leaderboardToggle      = document.getElementById('leaderboard-toggle');
+    const leaderboardBody        = document.getElementById('leaderboard-body');
+    const leaderboardToggleIcon  = document.getElementById('leaderboard-toggle-icon');
+    const leaderboardModeNote    = document.getElementById('leaderboard-mode-note');
     const newgameOverlay         = document.getElementById('newgame-overlay');
     const newgameCompetitionBtn  = document.getElementById('newgame-competition-btn');
     const newgameCasualBtn       = document.getElementById('newgame-casual-btn');
@@ -116,6 +120,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     newgameCancelBtn.addEventListener('click', () => {
         newgameOverlay.style.display = 'none';
+    });
+
+    // Toggle žebříčku
+    leaderboardToggle.addEventListener('click', () => {
+        const isOpen = leaderboardBody.style.display !== 'none';
+        leaderboardBody.style.display = isOpen ? 'none' : 'block';
+        leaderboardToggleIcon.textContent = isOpen ? '▼' : '▲';
     });
 
     difficultySelect.addEventListener('change', () => {
@@ -542,14 +553,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // =============================================
     function listenLeaderboard() {
         if (leaderboardUnsubscribe) { leaderboardUnsubscribe(); leaderboardUnsubscribe = null; }
+
+        // Vždy sleduj soutěžní puzzle ID (i při casual hře)
+        const difficulty = difficultySelect.value;
+        const competitionPuzzleId = getTodayPuzzleId(difficulty);
+
+        // Poznámka o módu
         if (isCasualMode) {
-            leaderboardList.innerHTML = '<p class="leaderboard-empty">Hra mimo soutěž — výsledky se neukládají.</p>';
-            return;
+            leaderboardModeNote.textContent = '🎲 Hraješ mimo soutěž — tvůj výsledek se do žebříčku neuloží.';
+            leaderboardModeNote.style.display = 'block';
+        } else {
+            leaderboardModeNote.textContent = '';
+            leaderboardModeNote.style.display = 'none';
         }
 
         const q = query(
             collection(db, 'results'),
-            where('puzzleId', '==', todayPuzzleId),
+            where('puzzleId', '==', competitionPuzzleId),
             orderBy('seconds', 'asc')
         );
 
@@ -589,6 +609,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
                 leaderboardList.appendChild(row);
             });
+
+            // Automaticky rozbal žebříček pokud je hráč v výsledcích
+            const playerInResults = Array.from(snapshot.docs).some(d => d.data().nickname === playerNickname);
+            if (playerInResults && leaderboardBody.style.display === 'none') {
+                leaderboardBody.style.display = 'block';
+                leaderboardToggleIcon.textContent = '▲';
+            }
         });
     }
 
