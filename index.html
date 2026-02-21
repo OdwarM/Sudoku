@@ -8,6 +8,17 @@
 </head>
 <body>
 
+    <!-- Dialog: Nová hra -->
+    <div id="newgame-overlay" class="overlay" style="display:none;">
+        <div class="overlay-box">
+            <h2>Nová hra</h2>
+            <p>Jak chceš hrát?</p>
+            <button id="newgame-competition-btn" class="newgame-btn newgame-btn--primary">🏆 Soutěžní hra<br><small>Stejné zadání pro všechny, výsledek do žebříčku</small></button>
+            <button id="newgame-casual-btn" class="newgame-btn newgame-btn--secondary">🎲 Mimo soutěž<br><small>Náhodné nové zadání, výsledek se neukládá</small></button>
+            <button id="newgame-cancel-btn" class="newgame-btn newgame-btn--cancel">Zrušit</button>
+        </div>
+    </div>
+
     <!-- Přihlašovací okno -->
     <div id="nickname-overlay" class="overlay">
         <div class="overlay-box">
@@ -31,9 +42,9 @@
         <div class="difficulty-controls">
             <label for="difficulty">Obtížnost:</label>
             <select id="difficulty">
-                <option value="easy">Lehká (30 skrytých)</option>
-                <option value="medium" selected>Střední (40 skrytých)</option>
-                <option value="hard">Těžká (50 skrytých)</option>
+                <option value="easy">Lehká (40 skrytých)</option>
+                <option value="medium" selected>Střední (50 skrytých)</option>
+                <option value="hard">Těžká (60 skrytých)</option>
             </select>
         </div>
 
@@ -70,4 +81,3 @@
     <script type="module" src="script.js"></script>
 </body>
 </html>
-
