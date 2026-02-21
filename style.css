@@ -123,7 +123,7 @@ h1 {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: clamp(1em, 3.5vw, 1.3em);
+    font-size: clamp(1em, 6vw, 1.3em);
     font-weight: bold;
     background-color: #f8f9fa;
     border: 1px solid #ced4da;
@@ -483,6 +483,7 @@ h1 {
     margin-bottom: 10px;
     text-align: center;
 }
+
 
 
 
