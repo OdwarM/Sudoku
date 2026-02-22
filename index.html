@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sudoku Hra</title>
+    <title>Sudoku PRO</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -32,7 +35,7 @@
 
     <div class="container">
         <div class="top-bar">
-            <h1>Sudoku</h1>
+            <h1 class="game-title">数独 PRO</h1>
             <div class="player-info">
                 Hráč: <strong id="player-name-display">—</strong>
                 <button id="change-name-btn" title="Změnit jméno">✏️</button>
@@ -42,9 +45,9 @@
         <div class="difficulty-controls">
             <label for="difficulty">Obtížnost:</label>
             <select id="difficulty">
-                <option value="easy">Lehká (40 skrytých)</option>
-                <option value="medium" selected>Střední (50 skrytých)</option>
-                <option value="hard">Těžká (60 skrytých)</option>
+                <option value="easy">Lehká</option>
+                <option value="medium" selected>Střední</option>
+                <option value="hard">Těžká</option>
             </select>
         </div>
 
@@ -56,15 +59,22 @@
             <div id="sudoku-grid" class="sudoku-grid"></div>
         </div>
 
-        <div id="number-buttons" class="number-buttons"></div>
-
-        <div class="controls">
-            <button id="delete-numbers">Smazat políčko</button>
+        <!-- Tlačítko START -->
+        <div id="start-area" class="start-area">
+            <button id="start-btn" class="start-btn">▶ START</button>
         </div>
 
-        <div class="controls">
-            <button id="new-game-btn">Nová Hra</button>
-            <button id="check-solution-btn">Zkontrolovat Řešení</button>
+        <div id="game-controls" class="game-controls-hidden">
+            <div id="number-buttons" class="number-buttons"></div>
+
+            <div class="controls">
+                <button id="delete-numbers">Smazat políčko</button>
+            </div>
+
+            <div class="controls">
+                <button id="new-game-btn">Nová Hra</button>
+                <button id="check-solution-btn">Zkontrolovat Řešení</button>
+            </div>
         </div>
 
         <p id="message"></p>
