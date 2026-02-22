@@ -675,7 +675,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const medals = ['🥇', '🥈', '🥉'];
-            snapshot.forEach((docSnap, index) => {
+            const docs = snapshot.docs;
+            docs.forEach((docSnap, index) => {
                 const data = docSnap.data();
                 const m = String(Math.floor(data.seconds/60)).padStart(2,'0');
                 const s = String(data.seconds%60).padStart(2,'0');
@@ -683,7 +684,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.classList.add('leaderboard-row');
                 if (data.nickname === playerNickname) row.classList.add('leaderboard-me');
                 row.innerHTML = `
-                    <span class="lb-rank">${medals[index] || (index+1)+'.'}  </span>
+                    <span class="lb-rank">${medals[index] || (index+1)+'.'}</span>
                     <span class="lb-name">${data.nickname}</span>
                     <span class="lb-time">${m}:${s}</span>
                 `;
