@@ -468,3 +468,13 @@ h1 {
 .newgame-btn--secondary { background: linear-gradient(135deg, #28a745, #1e7e34); color: #fff; font-weight: bold; }
 .newgame-btn--cancel   { background: #e9ecef; color: #555; margin-top: 6px; }
 .newgame-btn:hover { opacity: 0.9; transform: scale(1.01); }
+
+/* =============================================
+   BODY HRÁČE v žebříčku
+   ============================================= */
+.lb-points {
+    font-size: 0.85em;
+    color: #f7931e;
+    font-weight: bold;
+    margin-left: 4px;
+}
