@@ -565,6 +565,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =============================================
+    // SKÓRE HRÁČŮ
+    // =============================================
+    async function getPlayerScore(nickname) {
+        try {
+            const d = await getDoc(doc(db, 'scores', nickname));
+            return d.exists() ? (d.data().points || 0) : 0;
+        } catch (e) { return 0; }
+    }
+
+    async function addPointToPlayer(nickname) {
+        try {
+            const ref = doc(db, 'scores', nickname);
+            const d = await getDoc(ref);
+            const current = d.exists() ? (d.data().points || 0) : 0;
+            await setDoc(ref, { nickname, points: current + 1 });
+        } catch (e) { console.error('Chyba při přidávání bodu:', e); }
+    }
+
+    // =============================================
     // VÝZVA (CHALLENGE)
     // =============================================
     async function loadChallenge() {
@@ -576,15 +595,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function saveChallenge() {
         try {
-            // Nové unikátní ID pro tuto výzvu
             const challengePuzzleId = `challenge_${Date.now()}`;
 
-            // 1. Smaž staré výsledky předchozí výzvy
+            // 1. Přidej bod vítězi předchozí výzvy (hráč s nejlepším časem)
             const oldChallenge = await loadChallenge();
             if (oldChallenge && oldChallenge.puzzleId) {
                 const oldResults = await getDocs(
-                    query(collection(db, 'results'), where('puzzleId', '==', oldChallenge.puzzleId))
+                    query(collection(db, 'results'),
+                        where('puzzleId', '==', oldChallenge.puzzleId),
+                        orderBy('seconds', 'asc'))
                 );
+                // Bod dostane jen pokud byli alespoň 2 hráči
+                if (oldResults.size >= 2) {
+                    const winner = oldResults.docs[0].data().nickname;
+                    await addPointToPlayer(winner);
+                    showMessage(`🏆 Bod připsán hráči ${winner}!`, 'success');
+                }
+                // Smaž staré výsledky
                 for (const d of oldResults.docs) await deleteDoc(d.ref);
             }
 
@@ -605,11 +632,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 timestamp: new Date()
             });
 
-            // 4. Přepni žebříček na nové challenge puzzleId
+            // 4. Přepni na nové challenge ID a obnov žebříček
             todayPuzzleId = challengePuzzleId;
+            isCasualMode = false; // Žebříček musí sledovat nové challenge ID
             listenLeaderboard();
 
-            showMessage('✅ Hra uložena jako výzva! Jsi první v novém žebříčku.', 'success');
+            showMessage('✅ Nová výzva uložena! Jsi první v novém žebříčku.', 'success');
         } catch (e) { console.error('Chyba při ukládání výzvy:', e); }
     }
 
@@ -619,7 +647,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const snap = await getDocs(q);
             if (snap.size >= 2) {
                 setTimeout(() => {
-                    const answer = confirm('Uložit tuto hru jako novou výzvu pro ostatní hráče?\n(Původní výzva bude nahrazena.)');
+                    const answer = confirm('Uložit tuto hru jako novou výzvu pro ostatní hráče?\n(Původní výzva bude nahrazena a vítěz předchozí výzvy dostane bod.)');
                     if (answer) saveChallenge();
                 }, 800);
             }
@@ -676,16 +704,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const medals = ['🥇', '🥈', '🥉'];
             const docs = snapshot.docs;
+
+            // Načti skóre pro všechny hráče v žebříčku najednou
+            const scorePromises = docs.map(d => getPlayerScore(d.data().nickname));
+            const scores = await Promise.all(scorePromises);
+
             docs.forEach((docSnap, index) => {
                 const data = docSnap.data();
                 const m = String(Math.floor(data.seconds/60)).padStart(2,'0');
                 const s = String(data.seconds%60).padStart(2,'0');
+                const points = scores[index];
+                const pointsBadge = points > 0 ? ` <span class="lb-points">⭐${points}</span>` : '';
                 const row = document.createElement('div');
                 row.classList.add('leaderboard-row');
                 if (data.nickname === playerNickname) row.classList.add('leaderboard-me');
                 row.innerHTML = `
                     <span class="lb-rank">${medals[index] || (index+1)+'.'}</span>
-                    <span class="lb-name">${data.nickname}</span>
+                    <span class="lb-name">${data.nickname}${pointsBadge}</span>
                     <span class="lb-time">${m}:${s}</span>
                 `;
                 leaderboardList.appendChild(row);
