@@ -632,10 +632,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 timestamp: new Date()
             });
 
-            // 4. Přepni na nové challenge ID a obnov žebříček
+            // 4. Přepni na nové challenge ID a obnov žebříček se správným ID
             todayPuzzleId = challengePuzzleId;
-            isCasualMode = false; // Žebříček musí sledovat nové challenge ID
-            listenLeaderboard();
+            isCasualMode = false;
+            listenLeaderboard(challengePuzzleId); // Předáme ID přímo — nezávisí na globální proměnné
 
             showMessage('✅ Nová výzva uložena! Jsi první v novém žebříčku.', 'success');
         } catch (e) { console.error('Chyba při ukládání výzvy:', e); }
@@ -657,17 +657,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // =============================================
     // ŽEBŘÍČEK
     // =============================================
-    function listenLeaderboard() {
+    function listenLeaderboard(explicitPuzzleId = null) {
         if (leaderboardUnsubscribe) { leaderboardUnsubscribe(); leaderboardUnsubscribe = null; }
 
-        // Použij aktuální todayPuzzleId — může být soutěžní, casual nebo challenge
-        // Pro casual hru zobrazíme výsledky výzvy (pokud existuje), jinak dnešní soutěžní
         const difficulty = difficultySelect.value;
         const competitionPuzzleId = getTodayPuzzleId(difficulty);
-        const leaderboardPuzzleId = isCasualMode ? competitionPuzzleId : todayPuzzleId;
+
+        // Priorita: explicitní ID > casual → soutěžní > todayPuzzleId
+        let leaderboardPuzzleId;
+        if (explicitPuzzleId) {
+            leaderboardPuzzleId = explicitPuzzleId;
+        } else if (isCasualMode) {
+            leaderboardPuzzleId = competitionPuzzleId;
+        } else {
+            leaderboardPuzzleId = todayPuzzleId;
+        }
 
         // Poznámka o módu
-        if (isCasualMode) {
+        if (isCasualMode && !explicitPuzzleId) {
             leaderboardModeNote.textContent = '🎲 Hraješ mimo soutěž — tvůj výsledek se do žebříčku neuloží.';
             leaderboardModeNote.style.display = 'block';
         } else {
